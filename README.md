@@ -1,100 +1,229 @@
-# aras-innovator-cli
+# Aras Innovator CLI
 
-A sample command-line interface (CLI) project for interacting with Aras Innovator.
+A command-line and graphical user interface tool for interacting with Aras Innovator PLM Solution. This tool enables document creation, file uploads, and AML (Aras Markup Language) execution through both CLI and GUI interfaces.
 
-**aras-innovator-cli** is a Visual Studio solution that demonstrates one approach to building standalone executable tools for Aras Innovator. This sample .NET Framework Console Application uses the [Aras.IOM SDK](https://www.nuget.org/packages/Aras.IOM) to connect to an Aras server and execute AML scripts.
+## Features
 
-## Project Details
-
-Release | Notes
---------|--------
-[v1.1.0](https://github.com/ArasLabs/aras-innovator-cli/releases/tag/v1.1.0) | Project was upgraded to use the standalone [Aras.IOM SDK](https://www.nuget.org/packages/Aras.IOM) via Nuget.org. This change ensures the built executable can be used with any Aras Innovator release supported by the SDK. Previously, the .exe was only sure to work with the Aras Innovator release the project was built for.
-[v1.0.0](https://github.com/ArasLabs/aras-innovator-cli/releases/tag/v1.0.0) | Sample project demonstrating how to create a CLI program that uses IOM to communicate with Aras Innovator.
-
-### Compatibility
-
-Project | Aras Innovator
---------|------
-[v1.1.0](https://github.com/ArasLabs/aras-innovator-cli/releases/tag/v1.1.0) | 12 SP18, R14-R35+
-[v1.0.0](https://github.com/ArasLabs/aras-innovator-cli/releases/tag/v1.0.0) | 11 SP12
+- **Command-Line Interface (CLI)**: Execute AML queries and commands
+- **Graphical User Interface (GUI)**: User-friendly Windows Forms application for document uploads
+- **Document Creation**: Create Document items in Aras Innovator
+- **File Upload**: Upload files to Aras vault with automatic linking
+- **Send To Integration**: Right-click any file in Windows Explorer to upload directly
+- **Settings Persistence**: Save connection settings for quick access
 
 ## Installation
 
-This project provides sample code for a standalone CLI tool that can be executed via Command Prompt/terminal or other application. It does not need to be installed. However, the Visual Studio solution does need to be built to create the .exe.
-
-The following section describes how to build the Visual Studio solution.
-
 ### Prerequisites
 
-- Visual Studio 2022 (Community, Professional, or Enterprise)
-- .NET Framework 4.7
-- Access to Aras Innovator server (for testing)
+- .NET Framework 4.7.2 or higher
+- Windows operating system
+- Access to Aras Innovator server
 
-### Build Instructions
+### Build from Source
 
-1. Clone or download this repository to your local machine.
-2. Open the solution file (`aras-innovator-cli.sln`) in Visual Studio 2022.
-3. Restore NuGet packages if prompted.
-4. Build the solution by selecting **Build > Build Solution** from the menu or pressing `Ctrl+Shift+B`.
-5. The executable will be located in the `bin\Debug` or `bin\Release` folder, depending on your build configuration.
+1. Clone the repository:
+```bash
+git clone https://github.com/jalaliamirreza/aras-innovator-cli.git
+cd aras-innovator-cli
+```
+
+2. Restore NuGet packages:
+```bash
+nuget restore
+```
+
+3. Build the solution:
+```bash
+msbuild ArasCLI.sln /t:Build /p:Configuration=Release
+```
+
+The executable will be in `ArasCLI\bin\Release\ArasCLI.exe`
 
 ## Usage
 
-![CLI interface](screenshots/innovatorCLI.PNG)
+### GUI Mode
 
-After [building the solution](#build-instructions), you can run the CLI executable from the command line. The tool requires several mandatory arguments and supports optional arguments for output and logging.
+1. **Launch the GUI**:
+   - Double-click `ArasCLI.exe` or run with `--gui` flag
+   - The GUI will open automatically if no command-line arguments are provided
 
-### Command
+2. **Fill in Connection Settings**:
+   - **Aras URL**: Your Aras Innovator server URL (e.g., `http://server/InnovatorServer`)
+   - **Database**: Database name (e.g., `InnovatorSolutions`)
+   - **User**: Your Aras username
+   - **Password**: Your Aras password
+   - Check "Save credentials" to remember URL, Database, and User (password is never saved)
+
+3. **Select File to Upload**:
+   - Click "Browse..." button to select a file
+   - Or type/paste the file path directly
+   - Or drag and drop a file into the "File to Upload" field
+
+4. **Set Document Properties** (optional):
+   - **Document Name**: Name for the document (auto-filled from filename if empty)
+   - **Item Number**: Item number for the document (auto-generated if empty)
+
+5. **Upload**:
+   - Click "Upload to Aras" button
+   - Monitor progress in the log area
+   - Status will show success or error messages
+
+### Send To Integration
+
+1. **Setup Send To**:
+   - Open the GUI
+   - Click "Setup Send To..." button
+   - A shortcut will be created in your Windows SendTo folder
+
+2. **Use Send To**:
+   - Right-click any file in Windows Explorer
+   - Select "Send to" → "Aras Innovator Upload"
+   - The GUI will open with the file pre-selected
+   - Fill in connection settings and click "Upload to Aras"
+
+### Command-Line Interface
+
+#### Basic Syntax
 
 ```bash
-aras-innovator-cli.exe -l <url> -d <dbname> -u <user> -p <password> -f <input_aml_file> [options]
+ArasCLI.exe -l <url> -d <database> -u <user> -p <password> [options]
 ```
 
-### Mandatory Arguments
+#### Mandatory Parameters
 
-| Argument | Description            | Example                |
-|----------|------------------------|------------------------|
-| `-l`     | Aras Innovator URL     | `-l http://localhost/InnovatorServer` |
-| `-d`     | Database name          | `-d InnovatorSolutions`|
-| `-u`     | User login             | `-u admin`             |
-| `-p`     | User password          | `-p innovator`         |
-| `-f`     | Input AML file path    | `-f C:\input.xml`      |
+- `-l` or `--url`: Aras Innovator server URL
+- `-d` or `--database`: Database name
+- `-u` or `--user`: Username
+- `-p` or `--password`: Password
 
-### Optional Arguments
+#### Optional Parameters
 
-| Argument | Description            | Example                |
-|----------|------------------------|------------------------|
-| `-o`     | Output file path       | `-o C:\output.xml`     |
-| `-g`     | Log file path          | `-g C:\log.txt`        |
+- `-f` or `--inputfile`: Input AML file path
+- `-o` or `--outputfile`: Output file path for results
+- `-g` or `--log`: Log file path
+- `-c` or `--config`: Configuration file path
+- `--create-doc`: Enable document creation mode
+- `--file` or `-file`: File path to upload (required with `--create-doc`)
+- `--name` or `-name`: Document name
+- `--item-number` or `-n`: Document item number (auto-generated if not provided)
+- `--gui`: Launch GUI mode
 
-### Example
+#### Examples
 
+**Execute AML file**:
 ```bash
-aras-innovator-cli.exe -l http://localhost/InnovatorServer -d InnovatorSolutions -u admin -p innovator -f C:\input.xml -o C:\output.xml -g C:\log.txt
+ArasCLI.exe -l http://server/InnovatorServer -d InnovatorSolutions -u admin -p innovator -f query.xml
 ```
 
-This command sends the AML content from `input.xml` to the specified Aras Innovator server and writes the response to `output.xml` and logs to `log.txt`.
+**Create document and upload file**:
+```bash
+ArasCLI.exe -l http://server/InnovatorServer -d InnovatorSolutions -u admin -p innovator --create-doc --file "C:\path\to\file.pdf" --name "My Document"
+```
 
-## Contributing
+**Launch GUI**:
+```bash
+ArasCLI.exe --gui
+```
 
-1. Fork it!
-2. Create your feature branch: `git checkout -b my-new-feature`
-3. Commit your changes: `git commit -am 'Add some feature'`
-4. Push to the branch: `git push origin my-new-feature`
-5. Submit a pull request
+**Show help**:
+```bash
+ArasCLI.exe -h
+```
 
-For more information on contributing to this project, another Aras Labs project, or any Aras Community project, shoot us an email at [araslabs@aras.com](mailto:araslabs@aras.com).
+## Configuration File
 
-## Credits
+You can create a configuration file to store connection settings:
 
-### Creator
+```
+l:http://server/InnovatorServer
+d:InnovatorSolutions
+u:admin
+p:innovator
+```
 
-Project written, documented, and published by Yoann Maingon at Aras Labs. @YoannArasLab
+Use it with:
+```bash
+ArasCLI.exe -c config.txt [other options]
+```
 
-### Contributors
+## Technical Details
 
-[Eli J. Donahue](https://github.com/EliJDonahue), Aras Labs
+### File Upload Process
+
+1. **Document Creation**: Creates a Document item in Aras Innovator
+2. **File Upload**: Uploads the file to the Aras vault using `attachPhysicalFile()` method
+3. **Relationship Creation**: Creates a Document File relationship to link the file to the document
+4. **Verification**: Verifies the file was uploaded and linked successfully
+
+### Architecture
+
+- **Language**: C# (.NET Framework 4.7.2)
+- **UI Framework**: Windows Forms
+- **Aras SDK**: Aras.IOM 15.0.1
+- **Build System**: MSBuild
+
+### Project Structure
+
+```
+aras-innovator-cli/
+├── ArasCLI/
+│   ├── Program.cs          # Main entry point, CLI logic
+│   ├── MainForm.cs         # GUI form implementation
+│   ├── ArasCLI.csproj      # Project file
+│   └── App.config          # Application configuration
+├── README.md               # This file
+├── DEVELOPER.md            # Developer documentation
+└── ArasCLI.sln            # Solution file
+```
+
+## Troubleshooting
+
+### Browse Button Not Responding
+- Ensure you're using the latest build
+- Try typing the file path directly or using drag-and-drop
+- Check Windows event logs for errors
+
+### Connection Errors
+- Verify the Aras server URL is correct
+- Check network connectivity
+- Ensure credentials are correct
+- Verify database name matches your Aras instance
+
+### File Upload Errors
+- Ensure the file path is accessible
+- Check file permissions
+- Verify Aras vault server is running and accessible
+- Check Aras server logs for detailed error messages
+
+### Send To Not Working
+- Run "Setup Send To..." again from the GUI
+- Check if shortcut exists in: `%APPDATA%\Microsoft\Windows\SendTo\`
+- Ensure you have write permissions to the SendTo folder
 
 ## License
 
-Aras Labs projects are published to Github under the MIT license. See the [LICENSE file](https://github.com/ArasLabs/toc-search-bar/blob/master/LICENSE.md) for license rights and limitations.
+This project is open source. Please refer to the license file for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit pull requests or open issues.
+
+## Support
+
+For issues, questions, or contributions, please visit the GitHub repository:
+https://github.com/jalaliamirreza/aras-innovator-cli
+
+## Version History
+
+### Version 0.1
+- Initial release
+- CLI functionality for AML execution
+- GUI for document creation and file upload
+- Send To integration
+- Settings persistence
+
+## Acknowledgments
+
+- Built using Aras IOM SDK
+- Based on Aras community patterns for file upload
+- Community discussion reference: https://community.aras.com/discussions/development/upload-a-file-using-c-as-a-server-method/6209
