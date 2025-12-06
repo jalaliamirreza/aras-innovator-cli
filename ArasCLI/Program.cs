@@ -5,12 +5,220 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Aras.IOM;
+using Aras.IOME;
 
 namespace ArasCLI
 {
    
     class Program
     {
+        static Item CreateDocumentAndCheckinFile(Innovator inn, HttpServerConnection conn, string filePath, string itemNum, string docName)
+        {
+            try
+            {
+                // Create a new Document item
+                System.Console.WriteLine("Creating Document item...");
+                Item document = inn.newItem("Document", "add");
+                
+                // Set item_number - required field, generate if not provided
+                if (!string.IsNullOrEmpty(itemNum))
+                {
+                    document.setProperty("item_number", itemNum);
+                }
+                else
+                {
+                    // Generate a simple item number based on timestamp
+                    string generatedItemNumber = "DOC-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                    document.setProperty("item_number", generatedItemNumber);
+                    System.Console.WriteLine("Generated item_number: " + generatedItemNumber);
+                }
+                
+                // Set name if provided
+                if (!string.IsNullOrEmpty(docName))
+                {
+                    document.setProperty("name", docName);
+                }
+                
+                // Apply the item to create it in Aras
+                document = document.apply();
+                
+                if (document.isError())
+                {
+                    System.Console.WriteLine("Error creating document: " + document.getErrorString());
+                    return document;
+                }
+                
+                System.Console.WriteLine("Document created successfully. ID: " + document.getID());
+                
+                // Upload file to the document using Aras file upload mechanism
+                System.Console.WriteLine("Uploading file to document...");
+                
+                try
+                {
+                    string fileName = Path.GetFileName(filePath);
+                    FileInfo fileInfo = new FileInfo(filePath);
+                    
+                    if (!fileInfo.Exists)
+                    {
+                        Item errorItem = inn.newError("File not found: " + filePath);
+                        return errorItem;
+                    }
+                    
+                    System.Console.WriteLine("File: " + fileName + " (" + fileInfo.Length + " bytes)");
+                    
+                    // Based on Aras community example: Create File item, attachPhysicalFile, then apply
+                    // Reference: https://community.aras.com/discussions/development/upload-a-file-using-c-as-a-server-method/6209
+                    System.Console.WriteLine("Creating File item and uploading file...");
+                    
+                    try
+                    {
+                        string absoluteFilePath = Path.GetFullPath(filePath);
+                        System.Console.WriteLine("File path: " + absoluteFilePath);
+                        
+                        // Step 1: Create File item (don't set source_id - we'll link via relationship)
+                        System.Console.WriteLine("Creating File item...");
+                        Item fileItem = inn.newItem("File", "add");
+                        fileItem.setProperty("filename", fileName);
+                        
+                        // Step 2: Attach physical file using attachPhysicalFile
+                        // This method marks the file for upload when apply() is called
+                        System.Console.WriteLine("Attaching physical file...");
+                        fileItem.attachPhysicalFile(absoluteFilePath);
+                        
+                        // Step 3: Apply the File item - this uploads the file to the vault
+                        System.Console.WriteLine("Uploading file to vault...");
+                        Item fileResult = fileItem.apply();
+                        
+                        if (fileResult.isError())
+                        {
+                            System.Console.WriteLine("File upload error: " + fileResult.getErrorString());
+                            System.Console.WriteLine("Document created successfully. File upload may need manual intervention.");
+                            return document;
+                        }
+                        
+                        string fileId = fileResult.getID();
+                        System.Console.WriteLine("File uploaded successfully. File ID: " + fileId);
+                        
+                        // Step 4: Create Document File relationship to link the file to the document
+                        // Use createRelationship and setRelatedItem to properly link them
+                        System.Console.WriteLine("Creating Document File relationship...");
+                        Item docFileRel = document.createRelationship("Document File", "add");
+                        docFileRel.setRelatedItem(fileResult); // Use setRelatedItem with the File item
+                        Item relResult = docFileRel.apply();
+                        
+                        if (relResult.isError())
+                        {
+                            System.Console.WriteLine("Warning: Could not create Document File relationship: " + relResult.getErrorString());
+                            System.Console.WriteLine("Attempting alternative method...");
+                            
+                            // Alternative: Create relationship using newItem
+                            Item altRel = inn.newItem("Document File", "add");
+                            altRel.setProperty("source_id", document.getID());
+                            altRel.setProperty("related_id", fileId);
+                            Item altResult = altRel.apply();
+                            
+                            if (altResult.isError())
+                            {
+                                System.Console.WriteLine("Alternative method also failed: " + altResult.getErrorString());
+                                System.Console.WriteLine("File is uploaded but may not be linked to document. File ID: " + fileId);
+                            }
+                            else
+                            {
+                                System.Console.WriteLine("Document File relationship created successfully (alternative method).");
+                                System.Console.WriteLine("File has been uploaded to vault and linked to document.");
+                            }
+                        }
+                        else
+                        {
+                            System.Console.WriteLine("Document File relationship created successfully.");
+                            System.Console.WriteLine("File has been uploaded to vault and linked to document.");
+                        }
+                        
+                        // Verify the relationship was created
+                        System.Console.WriteLine("Verifying relationship...");
+                        // Get document with relationships explicitly loaded
+                        Item docQuery = inn.newItem("Document", "get");
+                        docQuery.setID(document.getID());
+                        docQuery.setAttribute("select", "id,item_number,name");
+                        Item docFileRelQuery = docQuery.createRelationship("Document File", "get");
+                        docFileRelQuery.setAttribute("select", "id,related_id");
+                        Item fileQuery = docFileRelQuery.createRelatedItem("File", "get");
+                        fileQuery.setAttribute("select", "id,filename,file_size");
+                        Item refreshedDoc = docQuery.apply();
+                        
+                        if (refreshedDoc != null && !refreshedDoc.isError())
+                        {
+                            Item docFiles = refreshedDoc.getRelationships("Document File");
+                            if (docFiles != null && docFiles.getItemCount() > 0)
+                            {
+                                System.Console.WriteLine("Verified: Document File relationship exists (" + docFiles.getItemCount() + " file(s) linked).");
+                                for (int i = 0; i < docFiles.getItemCount(); i++)
+                                {
+                                    Item rel = docFiles.getItemByIndex(i);
+                                    Item relatedFile = rel.getRelatedItem();
+                                    if (relatedFile != null && !relatedFile.isError())
+                                    {
+                                        string relFileId = relatedFile.getID();
+                                        string relFileName = relatedFile.getProperty("filename");
+                                        string relFileSize = relatedFile.getProperty("file_size");
+                                        System.Console.WriteLine("  - Linked File: " + relFileName + " (" + relFileSize + " bytes, ID: " + relFileId + ")");
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                System.Console.WriteLine("Warning: Document File relationship not found in query result.");
+                                System.Console.WriteLine("Note: Relationship may be in pending state. Check Document in Aras UI.");
+                            }
+                        }
+                        else
+                        {
+                            System.Console.WriteLine("Warning: Could not query document for verification.");
+                        }
+                        
+                        // Verify the file was uploaded
+                        Item verifyFile = inn.getItemById("File", fileId);
+                        if (verifyFile != null && !verifyFile.isError())
+                        {
+                            string verifyFilename = verifyFile.getProperty("filename");
+                            string fileSize = verifyFile.getProperty("file_size");
+                            System.Console.WriteLine("Verified: File item exists with filename: " + verifyFilename + " (" + fileSize + " bytes)");
+                        }
+                        
+                        return fileResult;
+                    }
+                    catch (Exception uploadEx)
+                    {
+                        System.Console.WriteLine("Exception during file upload: " + uploadEx.Message);
+                        if (uploadEx.InnerException != null)
+                        {
+                            System.Console.WriteLine("Inner exception: " + uploadEx.InnerException.Message);
+                        }
+                        System.Console.WriteLine("Document created successfully. File upload may need manual intervention.");
+                        return document;
+                    }
+                }
+                catch (Exception uploadEx)
+                {
+                    System.Console.WriteLine("Exception during file upload: " + uploadEx.Message);
+                    System.Console.WriteLine("Document created successfully. File upload may need manual intervention.");
+                    // Don't fail completely - document was created
+                }
+                
+                // Return the document item with checkin result
+                return document;
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine("Exception during document creation/checkin: " + ex.Message);
+                System.Console.WriteLine(ex.StackTrace);
+                
+                // Return an error item
+                Item errorItem = inn.newError(ex.Message);
+                return errorItem;
+            }
+        }
+        
         static void Main(string[] args)
         {
             
@@ -22,6 +230,10 @@ namespace ArasCLI
             string filepathin = "";
             string filepathout = "";
             string filepathlog = "";
+            bool createDocument = false;
+            string fileToCheckin = "";
+            string itemNumber = "";
+            string documentName = "";
 
             System.Console.WriteLine(@"
 
@@ -146,6 +358,26 @@ namespace ArasCLI
                         filepathlog = args[i + 1];
                         System.Console.WriteLine(" - Output file = " + args[i + 1]);
                         break;
+                    case "--create-doc":
+                    case "-cd":
+                        createDocument = true;
+                        System.Console.WriteLine(" - Document creation mode enabled");
+                        break;
+                    case "--file":
+                    case "-file":
+                        fileToCheckin = args[i + 1];
+                        System.Console.WriteLine(" - File to checkin = " + args[i + 1]);
+                        break;
+                    case "--item-number":
+                    case "-n":
+                        itemNumber = args[i + 1];
+                        System.Console.WriteLine(" - Item number = " + args[i + 1]);
+                        break;
+                    case "--name":
+                    case "-name":
+                        documentName = args[i + 1];
+                        System.Console.WriteLine(" - Document name = " + args[i + 1]);
+                        break;
 
                 }
             }
@@ -213,63 +445,96 @@ namespace ArasCLI
                     return;
                 }
 
-                System.Console.WriteLine("");
-                // read AML
-                System.Console.WriteLine("Read AML file");
-                string readAML;
                 try
                 {
-                    readAML = File.ReadAllText(filepathin);
-                }
-                catch (Exception ex)
-                {
-                    System.Console.WriteLine(ex);
-                    return;
-                }
-
-                System.Console.WriteLine("Commit AML file");
-                Item result = inn.applyAML(readAML);
-
-
-         
-                if (result.isError())
-                {
-                    System.Console.Write(result.getErrorString());
-                }
-                else
-                {
-                    System.Console.Write(result.dom.OuterXml);
-
-                }
-
-                
-
-                if (filepathout != "")
-                {
-                    try
+                    Item result;
+                    
+                    // Check if document creation mode is enabled
+                    if (createDocument)
                     {
-                        File.WriteAllText(filepathout, result.dom.OuterXml);
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Console.WriteLine(ex);
-                        return;
-                    }
-                }
+                        // Validate file parameter
+                        if (string.IsNullOrEmpty(fileToCheckin))
+                        {
+                            System.Console.WriteLine("Error: --file parameter is required when using --create-doc");
+                            conn.Logout();
+                            return;
+                        }
 
-                if (filepathlog != "")
-                {
-                    try
-                    {
-                        File.WriteAllText(filepathlog, result.dom.OuterXml);
+                        // Validate file exists
+                        if (!File.Exists(fileToCheckin))
+                        {
+                            System.Console.WriteLine("Error: File not found: " + fileToCheckin);
+                            conn.Logout();
+                            return;
+                        }
+
+                        System.Console.WriteLine("");
+                        System.Console.WriteLine("Creating document and checking in file...");
+                        result = CreateDocumentAndCheckinFile(inn, conn, fileToCheckin, itemNumber, documentName);
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        System.Console.WriteLine(ex);
-                        return;
+                        // Original AML execution workflow
+                        System.Console.WriteLine("");
+                        // read AML
+                        System.Console.WriteLine("Read AML file");
+                        string readAML;
+                        try
+                        {
+                            readAML = File.ReadAllText(filepathin);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Console.WriteLine(ex);
+                            conn.Logout();
+                            return;
+                        }
+
+                        System.Console.WriteLine("Commit AML file");
+                        result = inn.applyAML(readAML);
+                    }
+
+                    if (result.isError())
+                    {
+                        System.Console.Write(result.getErrorString());
+                    }
+                    else
+                    {
+                        System.Console.Write(result.dom.OuterXml);
+                    }
+
+                    if (filepathout != "")
+                    {
+                        try
+                        {
+                            File.WriteAllText(filepathout, result.dom.OuterXml);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Console.WriteLine(ex);
+                            conn.Logout();
+                            return;
+                        }
+                    }
+
+                    if (filepathlog != "")
+                    {
+                        try
+                        {
+                            File.WriteAllText(filepathlog, result.dom.OuterXml);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Console.WriteLine(ex);
+                            conn.Logout();
+                            return;
+                        }
                     }
                 }
-                conn.Logout();
+                finally
+                {
+                    conn.Logout();
+                }
                 System.Console.WriteLine(@"
 
                 ");
