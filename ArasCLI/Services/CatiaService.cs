@@ -1,23 +1,26 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Reflection;
 using System.Collections.Generic;
 
 namespace ArasCLI.Services
 {
     /// <summary>
     /// Service class for CATIA V5 operations via COM Automation.
+    /// Uses reflection-based invocation for better compatibility with CATIA V5-6R2022.
     /// </summary>
     public class CatiaService : IDisposable
     {
-        private dynamic _catiaApp;
+        private object _catiaApp;
+        private Type _catiaType;
         private bool _isConnected;
         private bool _disposed;
 
         public bool IsConnected => _isConnected;
 
         /// <summary>
-        /// Connect to a running CATIA instance.
+        /// Connect to CATIA instance using reflection-based approach.
         /// </summary>
         public bool Connect(out string errorMessage)
         {
@@ -25,42 +28,109 @@ namespace ArasCLI.Services
 
             try
             {
-                // Try to get existing CATIA instance
-                _catiaApp = Marshal.GetActiveObject("CATIA.Application");
+                // Get CATIA COM type from registry
+                _catiaType = Type.GetTypeFromProgID("CATIA.Application");
+
+                if (_catiaType == null)
+                {
+                    errorMessage = "CATIA is not installed or not registered on this system.";
+                    return false;
+                }
+
+                // Create or connect to CATIA instance
+                _catiaApp = Activator.CreateInstance(_catiaType);
+
+                if (_catiaApp == null)
+                {
+                    errorMessage = "Failed to create CATIA instance.";
+                    return false;
+                }
+
+                // Wait for CATIA to initialize
+                System.Threading.Thread.Sleep(1000);
+
+                // Make CATIA visible
+                try
+                {
+                    InvokeSet("Visible", true);
+                }
+                catch { }
+
                 _isConnected = true;
                 return true;
             }
-            catch (COMException)
+            catch (COMException ex)
             {
-                // CATIA is not running, try to start it
-                try
-                {
-                    Type catiaType = Type.GetTypeFromProgID("CATIA.Application");
-                    if (catiaType == null)
-                    {
-                        errorMessage = "CATIA is not installed or not properly registered.";
-                        _isConnected = false;
-                        return false;
-                    }
-
-                    _catiaApp = Activator.CreateInstance(catiaType);
-                    _catiaApp.Visible = true;
-                    _isConnected = true;
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    errorMessage = "Could not start CATIA: " + ex.Message;
-                    _isConnected = false;
-                    return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                errorMessage = "Could not connect to CATIA: " + ex.Message;
+                errorMessage = $"COM Error connecting to CATIA: {ex.Message}";
                 _isConnected = false;
                 return false;
             }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error connecting to CATIA: {ex.Message}";
+                _isConnected = false;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Invoke a method on the CATIA COM object using reflection.
+        /// </summary>
+        private object InvokeMethod(string methodName, params object[] args)
+        {
+            return _catiaType.InvokeMember(methodName,
+                BindingFlags.InvokeMethod | BindingFlags.Public | BindingFlags.Instance,
+                null, _catiaApp, args);
+        }
+
+        /// <summary>
+        /// Get a property from the CATIA COM object using reflection.
+        /// </summary>
+        private object InvokeGet(string propertyName)
+        {
+            return _catiaType.InvokeMember(propertyName,
+                BindingFlags.GetProperty | BindingFlags.Public | BindingFlags.Instance,
+                null, _catiaApp, null);
+        }
+
+        /// <summary>
+        /// Set a property on the CATIA COM object using reflection.
+        /// </summary>
+        private void InvokeSet(string propertyName, object value)
+        {
+            _catiaType.InvokeMember(propertyName,
+                BindingFlags.SetProperty | BindingFlags.Public | BindingFlags.Instance,
+                null, _catiaApp, new object[] { value });
+        }
+
+        /// <summary>
+        /// Get a property from a COM object using reflection.
+        /// </summary>
+        private object GetProperty(object comObject, string propertyName)
+        {
+            return comObject.GetType().InvokeMember(propertyName,
+                BindingFlags.GetProperty | BindingFlags.Public | BindingFlags.Instance,
+                null, comObject, null);
+        }
+
+        /// <summary>
+        /// Set a property on a COM object using reflection.
+        /// </summary>
+        private void SetProperty(object comObject, string propertyName, object value)
+        {
+            comObject.GetType().InvokeMember(propertyName,
+                BindingFlags.SetProperty | BindingFlags.Public | BindingFlags.Instance,
+                null, comObject, new object[] { value });
+        }
+
+        /// <summary>
+        /// Invoke a method on a COM object using reflection.
+        /// </summary>
+        private object CallMethod(object comObject, string methodName, params object[] args)
+        {
+            return comObject.GetType().InvokeMember(methodName,
+                BindingFlags.InvokeMethod | BindingFlags.Public | BindingFlags.Instance,
+                null, comObject, args);
         }
 
         /// <summary>
@@ -81,34 +151,73 @@ namespace ArasCLI.Services
         }
 
         /// <summary>
-        /// Get the active document in CATIA.
+        /// Get the active document in CATIA using reflection.
         /// </summary>
         public CatiaDocumentInfo GetActiveDocument(out string errorMessage)
         {
             errorMessage = null;
 
+            // Try to connect if not connected
             if (!_isConnected || _catiaApp == null)
             {
-                errorMessage = "Not connected to CATIA.";
-                return null;
+                if (!Connect(out string connectError))
+                {
+                    errorMessage = "Could not connect to CATIA: " + connectError;
+                    return null;
+                }
             }
 
             try
             {
-                dynamic activeDoc = _catiaApp.ActiveDocument;
+                // Get Documents collection using reflection
+                object documents = InvokeGet("Documents");
+                if (documents == null)
+                {
+                    errorMessage = "Could not access CATIA Documents collection.";
+                    return null;
+                }
+
+                int docCount = Convert.ToInt32(GetProperty(documents, "Count"));
+
+                if (docCount == 0)
+                {
+                    errorMessage = "No document is open in CATIA.";
+                    Marshal.ReleaseComObject(documents);
+                    return null;
+                }
+
+                object activeDoc = null;
+                try
+                {
+                    activeDoc = InvokeGet("ActiveDocument");
+                }
+                catch (Exception)
+                {
+                    // If ActiveDocument fails, try to get the first document
+                    activeDoc = CallMethod(documents, "Item", 1);
+                }
 
                 if (activeDoc == null)
                 {
                     errorMessage = "No document is open in CATIA.";
+                    Marshal.ReleaseComObject(documents);
                     return null;
                 }
 
                 var docInfo = new CatiaDocumentInfo
                 {
-                    FullPath = activeDoc.FullName,
-                    Name = activeDoc.Name,
-                    IsSaved = !activeDoc.Saved // Saved property is inverted (true = has unsaved changes)
+                    FullPath = GetProperty(activeDoc, "FullName")?.ToString(),
+                    Name = GetProperty(activeDoc, "Name")?.ToString(),
+                    IsSaved = true // Default to saved
                 };
+
+                // Try to get Saved property safely
+                try
+                {
+                    bool saved = Convert.ToBoolean(GetProperty(activeDoc, "Saved"));
+                    docInfo.IsSaved = saved;
+                }
+                catch { }
 
                 // Determine document type
                 string extension = Path.GetExtension(docInfo.FullPath).ToLower();
@@ -119,24 +228,56 @@ namespace ArasCLI.Services
                 {
                     if (extension == ".catpart")
                     {
-                        dynamic part = activeDoc.Part;
-                        docInfo.PartNumber = part.Parameters.Item("PartNumber").ValueAsString;
+                        object part = GetProperty(activeDoc, "Part");
+                        if (part != null)
+                        {
+                            object parameters = GetProperty(part, "Parameters");
+                            if (parameters != null)
+                            {
+                                try
+                                {
+                                    object partNumParam = CallMethod(parameters, "Item", "PartNumber");
+                                    if (partNumParam != null)
+                                    {
+                                        docInfo.PartNumber = GetProperty(partNumParam, "ValueAsString")?.ToString();
+                                        Marshal.ReleaseComObject(partNumParam);
+                                    }
+                                }
+                                catch { }
 
-                        // Try to get other properties
-                        try { docInfo.Nomenclature = part.Parameters.Item("Nomenclature").ValueAsString; } catch { }
-                        try { docInfo.Revision = part.Parameters.Item("Revision").ValueAsString; } catch { }
-                        try { docInfo.Definition = part.Parameters.Item("Definition").ValueAsString; } catch { }
+                                try
+                                {
+                                    object nomParam = CallMethod(parameters, "Item", "Nomenclature");
+                                    if (nomParam != null)
+                                    {
+                                        docInfo.Nomenclature = GetProperty(nomParam, "ValueAsString")?.ToString();
+                                        Marshal.ReleaseComObject(nomParam);
+                                    }
+                                }
+                                catch { }
+
+                                Marshal.ReleaseComObject(parameters);
+                            }
+                            Marshal.ReleaseComObject(part);
+                        }
                     }
                     else if (extension == ".catproduct")
                     {
-                        dynamic product = activeDoc.Product;
-                        docInfo.PartNumber = product.PartNumber;
-                        docInfo.Nomenclature = product.Nomenclature;
-                        docInfo.Revision = product.Revision;
-                        docInfo.Definition = product.Definition;
+                        object product = GetProperty(activeDoc, "Product");
+                        if (product != null)
+                        {
+                            docInfo.PartNumber = GetProperty(product, "PartNumber")?.ToString();
+                            docInfo.Nomenclature = GetProperty(product, "Nomenclature")?.ToString();
+                            docInfo.Revision = GetProperty(product, "Revision")?.ToString();
+                            docInfo.Definition = GetProperty(product, "Definition")?.ToString();
+                            Marshal.ReleaseComObject(product);
+                        }
                     }
                 }
                 catch { }
+
+                Marshal.ReleaseComObject(activeDoc);
+                Marshal.ReleaseComObject(documents);
 
                 return docInfo;
             }
@@ -148,21 +289,25 @@ namespace ArasCLI.Services
         }
 
         /// <summary>
-        /// Save the active document.
+        /// Save the active document using reflection.
         /// </summary>
         public bool SaveActiveDocument(out string errorMessage)
         {
             errorMessage = null;
 
+            // Try to connect if not connected
             if (!_isConnected || _catiaApp == null)
             {
-                errorMessage = "Not connected to CATIA.";
-                return false;
+                if (!Connect(out string connectError))
+                {
+                    errorMessage = "Could not connect to CATIA: " + connectError;
+                    return false;
+                }
             }
 
             try
             {
-                dynamic activeDoc = _catiaApp.ActiveDocument;
+                object activeDoc = InvokeGet("ActiveDocument");
 
                 if (activeDoc == null)
                 {
@@ -170,7 +315,8 @@ namespace ArasCLI.Services
                     return false;
                 }
 
-                activeDoc.Save();
+                CallMethod(activeDoc, "Save");
+                Marshal.ReleaseComObject(activeDoc);
                 return true;
             }
             catch (Exception ex)
@@ -181,7 +327,7 @@ namespace ArasCLI.Services
         }
 
         /// <summary>
-        /// Save the active document to a specific path.
+        /// Save the active document to a specific path using reflection.
         /// </summary>
         public bool SaveActiveDocumentAs(string filePath, out string errorMessage)
         {
@@ -195,7 +341,7 @@ namespace ArasCLI.Services
 
             try
             {
-                dynamic activeDoc = _catiaApp.ActiveDocument;
+                object activeDoc = InvokeGet("ActiveDocument");
 
                 if (activeDoc == null)
                 {
@@ -203,7 +349,8 @@ namespace ArasCLI.Services
                     return false;
                 }
 
-                activeDoc.SaveAs(filePath);
+                CallMethod(activeDoc, "SaveAs", filePath);
+                Marshal.ReleaseComObject(activeDoc);
                 return true;
             }
             catch (Exception ex)
@@ -214,7 +361,7 @@ namespace ArasCLI.Services
         }
 
         /// <summary>
-        /// Open a document in CATIA.
+        /// Open a document in CATIA using reflection.
         /// </summary>
         public bool OpenDocument(string filePath, out string errorMessage)
         {
@@ -226,7 +373,7 @@ namespace ArasCLI.Services
                 return false;
             }
 
-            // First, try to connect to running CATIA
+            // First, try to connect to CATIA
             if (!_isConnected || _catiaApp == null)
             {
                 Connect(out _); // Try to connect, ignore error
@@ -237,13 +384,22 @@ namespace ArasCLI.Services
             {
                 try
                 {
-                    _catiaApp.Visible = true;
-                    dynamic documents = _catiaApp.Documents;
-                    documents.Open(filePath);
+                    InvokeSet("Visible", true);
+                    object documents = InvokeGet("Documents");
+                    CallMethod(documents, "Open", filePath);
 
                     // Bring CATIA window to front
-                    try { _catiaApp.Windows.Item(1).Activate(); } catch { }
+                    try
+                    {
+                        object windows = InvokeGet("Windows");
+                        object window = CallMethod(windows, "Item", 1);
+                        CallMethod(window, "Activate");
+                        Marshal.ReleaseComObject(window);
+                        Marshal.ReleaseComObject(windows);
+                    }
+                    catch { }
 
+                    Marshal.ReleaseComObject(documents);
                     return true;
                 }
                 catch (Exception ex)
@@ -298,7 +454,7 @@ namespace ArasCLI.Services
         }
 
         /// <summary>
-        /// Close the active document.
+        /// Close the active document using reflection.
         /// </summary>
         public bool CloseActiveDocument(bool save, out string errorMessage)
         {
@@ -312,7 +468,7 @@ namespace ArasCLI.Services
 
             try
             {
-                dynamic activeDoc = _catiaApp.ActiveDocument;
+                object activeDoc = InvokeGet("ActiveDocument");
 
                 if (activeDoc == null)
                 {
@@ -322,10 +478,11 @@ namespace ArasCLI.Services
 
                 if (save)
                 {
-                    activeDoc.Save();
+                    CallMethod(activeDoc, "Save");
                 }
 
-                activeDoc.Close();
+                CallMethod(activeDoc, "Close");
+                Marshal.ReleaseComObject(activeDoc);
                 return true;
             }
             catch (Exception ex)
@@ -336,7 +493,7 @@ namespace ArasCLI.Services
         }
 
         /// <summary>
-        /// Get BOM (Bill of Materials) from a CATProduct assembly.
+        /// Get BOM (Bill of Materials) from a CATProduct assembly using reflection.
         /// </summary>
         public List<BomItem> GetBom(out string errorMessage)
         {
@@ -351,7 +508,7 @@ namespace ArasCLI.Services
 
             try
             {
-                dynamic activeDoc = _catiaApp.ActiveDocument;
+                object activeDoc = InvokeGet("ActiveDocument");
 
                 if (activeDoc == null)
                 {
@@ -359,15 +516,20 @@ namespace ArasCLI.Services
                     return bomItems;
                 }
 
-                string extension = Path.GetExtension((string)activeDoc.FullName).ToLower();
+                string fullName = GetProperty(activeDoc, "FullName")?.ToString();
+                string extension = Path.GetExtension(fullName).ToLower();
                 if (extension != ".catproduct")
                 {
                     errorMessage = "Active document is not a CATProduct assembly.";
+                    Marshal.ReleaseComObject(activeDoc);
                     return bomItems;
                 }
 
-                dynamic rootProduct = activeDoc.Product;
+                object rootProduct = GetProperty(activeDoc, "Product");
                 ExtractBomRecursive(rootProduct, bomItems, 0);
+
+                Marshal.ReleaseComObject(rootProduct);
+                Marshal.ReleaseComObject(activeDoc);
 
                 return bomItems;
             }
@@ -379,34 +541,38 @@ namespace ArasCLI.Services
         }
 
         /// <summary>
-        /// Recursively extract BOM items from assembly.
+        /// Recursively extract BOM items from assembly using reflection.
         /// </summary>
-        private void ExtractBomRecursive(dynamic product, List<BomItem> bomItems, int level)
+        private void ExtractBomRecursive(object product, List<BomItem> bomItems, int level)
         {
             try
             {
-                dynamic children = product.Products;
-                int childCount = children.Count;
+                object children = GetProperty(product, "Products");
+                int childCount = Convert.ToInt32(GetProperty(children, "Count"));
 
                 for (int i = 1; i <= childCount; i++)
                 {
                     try
                     {
-                        dynamic child = children.Item(i);
+                        object child = CallMethod(children, "Item", i);
 
                         var bomItem = new BomItem
                         {
-                            PartNumber = child.PartNumber,
-                            Name = child.Name,
-                            Nomenclature = child.Nomenclature,
-                            Revision = child.Revision,
+                            PartNumber = GetProperty(child, "PartNumber")?.ToString(),
+                            Name = GetProperty(child, "Name")?.ToString(),
+                            Nomenclature = GetProperty(child, "Nomenclature")?.ToString(),
+                            Revision = GetProperty(child, "Revision")?.ToString(),
                             Level = level,
                             Quantity = 1 // Would need to count occurrences for accurate quantity
                         };
 
                         try
                         {
-                            bomItem.FilePath = child.ReferenceProduct.Parent.FullName;
+                            object refProduct = GetProperty(child, "ReferenceProduct");
+                            object parent = GetProperty(refProduct, "Parent");
+                            bomItem.FilePath = GetProperty(parent, "FullName")?.ToString();
+                            Marshal.ReleaseComObject(parent);
+                            Marshal.ReleaseComObject(refProduct);
                         }
                         catch { }
 
@@ -415,16 +581,25 @@ namespace ArasCLI.Services
                         // Recurse into sub-assemblies
                         try
                         {
-                            dynamic subProducts = child.Products;
-                            if (subProducts != null && subProducts.Count > 0)
+                            object subProducts = GetProperty(child, "Products");
+                            if (subProducts != null)
                             {
-                                ExtractBomRecursive(child, bomItems, level + 1);
+                                int subCount = Convert.ToInt32(GetProperty(subProducts, "Count"));
+                                if (subCount > 0)
+                                {
+                                    ExtractBomRecursive(child, bomItems, level + 1);
+                                }
+                                Marshal.ReleaseComObject(subProducts);
                             }
                         }
                         catch { }
+
+                        Marshal.ReleaseComObject(child);
                     }
                     catch { }
                 }
+
+                Marshal.ReleaseComObject(children);
             }
             catch { }
         }
@@ -450,15 +625,14 @@ namespace ArasCLI.Services
         }
 
         /// <summary>
-        /// Check if CATIA is running.
+        /// Check if CATIA is running by looking for the process.
         /// </summary>
         public static bool IsCatiaRunning()
         {
             try
             {
-                dynamic catia = Marshal.GetActiveObject("CATIA.Application");
-                Marshal.ReleaseComObject(catia);
-                return true;
+                var processes = System.Diagnostics.Process.GetProcessesByName("CNEXT");
+                return processes.Length > 0;
             }
             catch
             {

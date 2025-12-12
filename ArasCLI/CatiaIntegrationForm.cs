@@ -254,7 +254,7 @@ namespace ArasCLI
             // Help text
             Label lblHelp = new Label
             {
-                Text = "Check-In: Upload active CATIA document to Aras\n" +
+                Text = "Check-In: Upload CATIA file to Aras (file browser)\n" +
                        "Check-Out: Download & lock document for editing\n" +
                        "Get Latest: Download latest version (read-only)\n" +
                        "Unlock: Release lock on selected document",
@@ -448,24 +448,73 @@ namespace ArasCLI
                 return;
             }
 
-            var docInfo = _catiaService.GetActiveDocument(out string docError);
-            if (docInfo == null)
-            {
-                MessageBox.Show("No active CATIA document.\n" + docError, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            // Save document first
-            SetStatus("Saving CATIA document...");
-            if (!_catiaService.SaveActiveDocument(out string saveError))
-            {
-                MessageBox.Show("Could not save CATIA document: " + saveError, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            string filePath = docInfo.FullPath;
+            string filePath = null;
             string itemNumber = txtItemNumber.Text;
             string documentName = txtDocumentName.Text;
+
+            // First try to get active document from CATIA (if COM works)
+            var docInfo = _catiaService.GetActiveDocument(out string docError);
+            if (docInfo != null)
+            {
+                // CATIA COM works - try to save and use active document
+                SetStatus("Saving CATIA document...");
+                if (_catiaService.SaveActiveDocument(out string saveError))
+                {
+                    filePath = docInfo.FullPath;
+                    Log($"Using active CATIA document: {filePath}");
+                }
+                else
+                {
+                    Log($"Could not save via COM, using file browser: {saveError}", LogLevel.Warning);
+                }
+            }
+            else
+            {
+                Log($"CATIA COM not available: {docError}", LogLevel.Warning);
+            }
+
+            // If CATIA COM didn't work, use file browser
+            if (string.IsNullOrEmpty(filePath))
+            {
+                Log("Opening file browser for Check-In...");
+
+                using (OpenFileDialog ofd = new OpenFileDialog())
+                {
+                    ofd.Title = "Select CATIA File to Check-In";
+                    ofd.Filter = "CATIA Files|*.CATPart;*.CATProduct;*.CATDrawing|" +
+                                 "CATIA Part (*.CATPart)|*.CATPart|" +
+                                 "CATIA Product (*.CATProduct)|*.CATProduct|" +
+                                 "CATIA Drawing (*.CATDrawing)|*.CATDrawing|" +
+                                 "All Files (*.*)|*.*";
+                    ofd.InitialDirectory = _configManager.Config.LocalWorkspace;
+
+                    if (ofd.ShowDialog() != DialogResult.OK)
+                    {
+                        Log("Check-In cancelled by user.");
+                        return;
+                    }
+
+                    filePath = ofd.FileName;
+
+                    // Auto-fill item number and name from filename if empty
+                    if (string.IsNullOrWhiteSpace(itemNumber))
+                    {
+                        itemNumber = Path.GetFileNameWithoutExtension(filePath);
+                        txtItemNumber.Text = itemNumber;
+                    }
+                    if (string.IsNullOrWhiteSpace(documentName))
+                    {
+                        documentName = Path.GetFileNameWithoutExtension(filePath);
+                        txtDocumentName.Text = documentName;
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                MessageBox.Show("No valid file selected.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
 
             btnCheckin.Enabled = false;
             SetStatus("Checking in to Aras...");
