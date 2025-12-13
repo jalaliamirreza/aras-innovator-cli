@@ -14,7 +14,7 @@ Public Sub ArasLogin()
     End If
 
     Set shell = CreateObject("WScript.Shell")
-    shell.Run """" & ARASCLI_PATH & """", 1, False
+    shell.Run """" & ARASCLI_PATH & """ --catia-login", 1, False
     Set shell = Nothing
     Set fso = Nothing
 End Sub
@@ -65,7 +65,7 @@ Public Sub ArasCheckOut()
     End If
 
     Set shell = CreateObject("WScript.Shell")
-    shell.Run """" & ARASCLI_PATH & """", 1, False
+    shell.Run """" & ARASCLI_PATH & """ --catia-checkout", 1, False
     Set shell = Nothing
     Set fso = Nothing
 End Sub

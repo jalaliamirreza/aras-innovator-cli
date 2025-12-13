@@ -11,9 +11,7 @@ Sub CATMain()
     End If
 
     Set shell = CreateObject("WScript.Shell")
-    shell.Run """" & ARASCLI_PATH & """", 1, False
+    shell.Run """" & ARASCLI_PATH & """ --catia-checkout", 1, False
     Set shell = Nothing
     Set fso = Nothing
-
-    MsgBox "Use Aras GUI to search and check out a document.", vbInformation, "Check Out"
 End Sub

@@ -37,7 +37,22 @@ namespace ArasCLI.Services
                     return false;
                 }
 
-                // Create or connect to CATIA instance
+                // Try to connect to existing CATIA instance first
+                try
+                {
+                    _catiaApp = Marshal.GetActiveObject("CATIA.Application");
+                    if (_catiaApp != null)
+                    {
+                        _isConnected = true;
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // No running instance, create new one
+                }
+
+                // Create new CATIA instance
                 _catiaApp = Activator.CreateInstance(_catiaType);
 
                 if (_catiaApp == null)
@@ -62,6 +77,49 @@ namespace ArasCLI.Services
             catch (COMException ex)
             {
                 errorMessage = $"COM Error connecting to CATIA: {ex.Message}";
+                _isConnected = false;
+                return false;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error connecting to CATIA: {ex.Message}";
+                _isConnected = false;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Connect to an existing running CATIA instance only (don't create new).
+        /// </summary>
+        public bool ConnectToRunning(out string errorMessage)
+        {
+            errorMessage = null;
+
+            try
+            {
+                _catiaType = Type.GetTypeFromProgID("CATIA.Application");
+
+                if (_catiaType == null)
+                {
+                    errorMessage = "CATIA is not installed or not registered on this system.";
+                    return false;
+                }
+
+                // Only connect to existing instance
+                _catiaApp = Marshal.GetActiveObject("CATIA.Application");
+
+                if (_catiaApp == null)
+                {
+                    errorMessage = "CATIA is not running.";
+                    return false;
+                }
+
+                _isConnected = true;
+                return true;
+            }
+            catch (COMException)
+            {
+                errorMessage = "CATIA is not running. Please start CATIA first.";
                 _isConnected = false;
                 return false;
             }

@@ -177,12 +177,15 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CatiaIntegrationForm.cs" />
+    <Compile Include="CatiaCheckOutForm.cs" />
+    <Compile Include="CatiaLoginForm.cs" />
     <Compile Include="MainForm.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Services\ArasService.cs" />
     <Compile Include="Services\CatiaService.cs" />
     <Compile Include="Services\ConfigManager.cs" />
+    <Compile Include="Services\SessionManager.cs" />
     <Compile Include="Properties\Settings.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>

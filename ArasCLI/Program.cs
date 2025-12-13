@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 using Aras.IOM;
 using Aras.IOME;
 
@@ -12,7 +13,7 @@ namespace ArasCLI
    
     class Program
     {
-        static Item CreateDocumentAndCheckinFile(Innovator inn, HttpServerConnection conn, string filePath, string itemNum, string docName)
+        public static Item CreateDocumentAndCheckinFile(Innovator inn, HttpServerConnection conn, string filePath, string itemNum, string docName)
         {
             try
             {
@@ -219,9 +220,90 @@ namespace ArasCLI
             }
         }
         
+        [STAThread]
         static void Main(string[] args)
         {
+            // Check for GUI mode or Send To mode
+            bool guiMode = false;
+            bool sendToMode = false;
+            bool catiaLoginMode = false;
+            bool catiaCheckOutMode = false;
+            string sendToFile = null;
+
+            // Check if any argument is a file path (Windows Send To passes file path directly)
+            foreach (string arg in args)
+            {
+                if (arg == "--gui" || arg == "-gui")
+                {
+                    guiMode = true;
+                }
+                else if (arg == "--sendto-file" || arg == "-sendto-file")
+                {
+                    sendToMode = true;
+                }
+                else if (arg == "--catia-login" || arg == "-catia-login")
+                {
+                    catiaLoginMode = true;
+                }
+                else if (arg == "--catia-checkout" || arg == "-catia-checkout")
+                {
+                    catiaCheckOutMode = true;
+                }
+                else if (!arg.StartsWith("-") && File.Exists(arg))
+                {
+                    // This is likely a file path from Send To
+                    sendToFile = arg;
+                    sendToMode = true;
+                }
+            }
+
+            // CATIA Login mode - show only login form
+            if (catiaLoginMode)
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+
+                using (var loginForm = new CatiaLoginForm())
+                {
+                    loginForm.ShowDialog();
+                    // Session is now stored in encrypted file and will persist
+                    // for Check-In, Check-Out, and other operations
+                }
+                return;
+            }
+
+            // CATIA Check-Out mode - show check-out form
+            if (catiaCheckOutMode)
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+
+                using (var checkOutForm = new CatiaCheckOutForm())
+                {
+                    checkOutForm.ShowDialog();
+                }
+                return;
+            }
+
+            // If no arguments or GUI mode requested, show GUI
+            if (args.Length == 0 || guiMode || sendToMode)
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+
+                MainForm form = new MainForm();
+
+                // If Send To mode, set the file path
+                if (!string.IsNullOrEmpty(sendToFile))
+                {
+                    form.SetFileFromSendTo(sendToFile);
+                }
+
+                Application.Run(form);
+                return;
+            }
             
+            // CLI mode - continue with existing logic
             string login = "";
             string password = "";
             string database = "";

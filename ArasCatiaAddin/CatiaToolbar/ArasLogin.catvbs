@@ -11,7 +11,7 @@ Sub CATMain()
     End If
 
     Set shell = CreateObject("WScript.Shell")
-    shell.Run """" & ARASCLI_PATH & """", 1, False
+    shell.Run """" & ARASCLI_PATH & """ --catia-login", 1, False
     Set shell = Nothing
     Set fso = Nothing
 End Sub
