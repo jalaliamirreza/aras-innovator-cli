@@ -20,7 +20,7 @@ Public Sub ArasLogin()
 End Sub
 
 Public Sub ArasCheckIn()
-    Dim fso As Object, shell As Object, doc As Document, docPath As String
+    Dim fso As Object, shell As Object
     Set fso = CreateObject("Scripting.FileSystemObject")
 
     If Not fso.FileExists(ARASCLI_PATH) Then
@@ -28,30 +28,24 @@ Public Sub ArasCheckIn()
         Exit Sub
     End If
 
-    If CATIA.Documents.Count = 0 Then
-        MsgBox "No document is open in CATIA.", vbExclamation, "Check In"
-        Exit Sub
-    End If
+    ' Save current document if open and unsaved
+    If CATIA.Documents.Count > 0 Then
+        Dim doc As Document
+        Set doc = CATIA.ActiveDocument
 
-    Set doc = CATIA.ActiveDocument
+        If doc.Saved = False Then
+            Dim result As VbMsgBoxResult
+            result = MsgBox("Document has unsaved changes. Save before check-in?", vbYesNoCancel + vbQuestion, "Check In")
+            If result = vbCancel Then Exit Sub
+            If result = vbYes Then doc.Save
+        End If
 
-    If doc.Saved = False Then
-        Dim result As VbMsgBoxResult
-        result = MsgBox("Document has unsaved changes. Save before check-in?", vbYesNoCancel + vbQuestion, "Check In")
-        If result = vbCancel Then Exit Sub
-        If result = vbYes Then doc.Save
-    End If
-
-    docPath = doc.FullName
-    If docPath = "" Then
-        MsgBox "Please save the document first.", vbExclamation, "Check In"
-        Exit Sub
+        Set doc = Nothing
     End If
 
     Set shell = CreateObject("WScript.Shell")
-    shell.Run """" & ARASCLI_PATH & """ """ & docPath & """", 1, False
+    shell.Run """" & ARASCLI_PATH & """ --catia-checkin", 1, False
     Set shell = Nothing
-    Set doc = Nothing
     Set fso = Nothing
 End Sub
 

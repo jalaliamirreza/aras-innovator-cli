@@ -177,6 +177,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CatiaIntegrationForm.cs" />
+    <Compile Include="CatiaCheckInForm.cs" />
     <Compile Include="CatiaCheckOutForm.cs" />
     <Compile Include="CatiaLoginForm.cs" />
     <Compile Include="MainForm.cs" />

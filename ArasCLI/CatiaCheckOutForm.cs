@@ -275,83 +275,69 @@ namespace ArasCLI
             try
             {
                 var innovator = SessionManager.Innovator;
+                int totalCount = 0;
 
-                // Search for CAD documents
-                Item query = innovator.newItem("CAD", "get");
-                query.setAttribute("select", "item_number,name,classification,state,modified_on");
+                // Search for Document items first
+                Item docQuery = innovator.newItem("Document", "get");
+                docQuery.setAttribute("select", "item_number,name,classification,state,modified_on");
 
-                // Add search criteria
                 if (searchTerm != "*")
                 {
-                    query.setProperty("item_number", $"%{searchTerm}%");
-                    query.setPropertyCondition("item_number", "like");
-
-                    // Also search by name using OR
-                    Item orQuery = innovator.newItem("CAD", "get");
-                    orQuery.setAttribute("select", "item_number,name,classification,state,modified_on");
-                    orQuery.setProperty("name", $"%{searchTerm}%");
-                    orQuery.setPropertyCondition("name", "like");
-
-                    // For now, just search by item_number - AML OR is complex
+                    docQuery.setProperty("item_number", $"%{searchTerm}%");
+                    docQuery.setPropertyCondition("item_number", "like");
                 }
 
-                query.setAttribute("orderBy", "modified_on DESC");
-                query.setAttribute("maxRecords", "50");
+                docQuery.setAttribute("orderBy", "modified_on DESC");
+                docQuery.setAttribute("maxRecords", "50");
 
-                Item result = query.apply();
-                _foundItemType = "CAD";
+                Item docResult = docQuery.apply();
 
-                if (result.isError())
+                if (!docResult.isError())
                 {
-                    // Try Document item type instead
-                    query = innovator.newItem("Document", "get");
-                    query.setAttribute("select", "item_number,name,classification,state,modified_on");
-
-                    if (searchTerm != "*")
+                    int count = docResult.getItemCount();
+                    for (int i = 0; i < count; i++)
                     {
-                        query.setProperty("item_number", $"%{searchTerm}%");
-                        query.setPropertyCondition("item_number", "like");
+                        Item item = docResult.getItemByIndex(i);
+                        AddItemToResults(item, "Document");
+                        totalCount++;
                     }
-
-                    query.setAttribute("orderBy", "modified_on DESC");
-                    query.setAttribute("maxRecords", "50");
-                    result = query.apply();
-                    _foundItemType = "Document";
                 }
 
-                if (result.isError())
+                // Also search for CAD items
+                Item cadQuery = innovator.newItem("CAD", "get");
+                cadQuery.setAttribute("select", "item_number,name,classification,state,modified_on");
+
+                if (searchTerm != "*")
                 {
-                    SetStatus("Search completed - no CAD items found", Color.Orange);
+                    cadQuery.setProperty("item_number", $"%{searchTerm}%");
+                    cadQuery.setPropertyCondition("item_number", "like");
+                }
+
+                cadQuery.setAttribute("orderBy", "modified_on DESC");
+                cadQuery.setAttribute("maxRecords", "50");
+
+                Item cadResult = cadQuery.apply();
+
+                if (!cadResult.isError())
+                {
+                    int count = cadResult.getItemCount();
+                    for (int i = 0; i < count; i++)
+                    {
+                        Item item = cadResult.getItemByIndex(i);
+                        AddItemToResults(item, "CAD");
+                        totalCount++;
+                    }
+                }
+
+                if (totalCount == 0)
+                {
+                    SetStatus("Search completed - no items found", Color.Orange);
                     return;
                 }
 
-                int count = result.getItemCount();
-                for (int i = 0; i < count; i++)
-                {
-                    Item item = result.getItemByIndex(i);
+                SetStatus($"Found {totalCount} item(s)", Color.Green);
 
-                    ListViewItem lvi = new ListViewItem(item.getProperty("item_number", ""));
-                    lvi.SubItems.Add(item.getProperty("name", ""));
-                    lvi.SubItems.Add(item.getProperty("classification", "CAD"));
-                    lvi.SubItems.Add(item.getProperty("state", ""));
-
-                    string modifiedOn = item.getProperty("modified_on", "");
-                    if (!string.IsNullOrEmpty(modifiedOn) && DateTime.TryParse(modifiedOn, out DateTime dt))
-                    {
-                        lvi.SubItems.Add(dt.ToString("yyyy-MM-dd HH:mm"));
-                    }
-                    else
-                    {
-                        lvi.SubItems.Add(modifiedOn);
-                    }
-
-                    lvi.Tag = item.getID(); // Store item ID for checkout
-                    lvResults.Items.Add(lvi);
-                }
-
-                SetStatus($"Found {count} item(s)", Color.Green);
-
-                if (count > 0)
+                if (totalCount > 0)
                 {
                     lvResults.Items[0].Selected = true;
                     btnCheckOut.Enabled = true;
@@ -362,6 +348,28 @@ namespace ArasCLI
                 SetStatus("Search failed: " + ex.Message, Color.Red);
                 MessageBox.Show("Search failed:\n\n" + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void AddItemToResults(Item item, string itemType)
+        {
+            ListViewItem lvi = new ListViewItem(item.getProperty("item_number", ""));
+            lvi.SubItems.Add(item.getProperty("name", ""));
+            lvi.SubItems.Add(itemType); // Show item type instead of classification
+            lvi.SubItems.Add(item.getProperty("state", ""));
+
+            string modifiedOn = item.getProperty("modified_on", "");
+            if (!string.IsNullOrEmpty(modifiedOn) && DateTime.TryParse(modifiedOn, out DateTime dt))
+            {
+                lvi.SubItems.Add(dt.ToString("yyyy-MM-dd HH:mm"));
+            }
+            else
+            {
+                lvi.SubItems.Add(modifiedOn);
+            }
+
+            // Store both item ID and item type for checkout
+            lvi.Tag = new SearchResultInfo { ItemId = item.getID(), ItemType = itemType };
+            lvResults.Items.Add(lvi);
         }
 
         private void LvResults_DoubleClick(object sender, EventArgs e)
@@ -438,9 +446,14 @@ namespace ArasCLI
             }
 
             ListViewItem selected = lvResults.SelectedItems[0];
-            string itemId = selected.Tag as string;
+            var resultInfo = selected.Tag as SearchResultInfo;
+            string itemId = resultInfo?.ItemId;
+            string itemType = resultInfo?.ItemType ?? _foundItemType;
             string itemNumber = selected.Text;
             string itemName = selected.SubItems[1].Text;
+
+            // Update _foundItemType for compatibility with rest of checkout code
+            _foundItemType = itemType;
 
             SetStatus($"Checking out {itemNumber}...", Color.Orange);
             progressBar.Visible = true;
@@ -466,7 +479,7 @@ namespace ArasCLI
                 SetStatus($"Checking lock status for {itemNumber}...", Color.Orange);
                 Application.DoEvents();
 
-                Item checkItem = innovator.getItemById(_foundItemType, itemId);
+                Item checkItem = innovator.getItemById(itemType, itemId);
                 if (checkItem != null && !checkItem.isError())
                 {
                     string lockedById = checkItem.getProperty("locked_by_id", "");
@@ -511,62 +524,81 @@ namespace ArasCLI
                     throw new Exception($"Failed to get item ({_foundItemType}): " + item.getErrorString());
                 }
 
-                // Get file info - try different approaches
+                // Get file info - approach depends on item type
                 string fileName = null;
                 string fileId = null;
 
-                // Try native_file property first
-                fileId = item.getProperty("native_file", "");
-                if (!string.IsNullOrEmpty(fileId))
+                if (itemType == "Document")
                 {
+                    // For Document items, get file from Document File relationship (latest version)
                     try
                     {
-                        Item fileItem = innovator.getItemById("File", fileId);
-                        if (fileItem != null && !fileItem.isError())
+                        Item docFileQuery = innovator.newItem("Document File", "get");
+                        docFileQuery.setAttribute("select", "related_id");
+                        docFileQuery.setProperty("source_id", itemId);
+                        docFileQuery.setAttribute("maxRecords", "1");
+                        docFileQuery.setAttribute("orderBy", "created_on DESC"); // Get latest file
+                        Item docFileResult = docFileQuery.apply();
+
+                        if (!docFileResult.isError() && docFileResult.getItemCount() > 0)
                         {
-                            fileName = fileItem.getProperty("filename", "");
-                        }
-                    }
-                    catch { }
-                }
-
-                // If no file yet, try relationships
-                if (string.IsNullOrEmpty(fileId) || string.IsNullOrEmpty(fileName))
-                {
-                    try
-                    {
-                        // Query the item with file relationships
-                        Item docQuery = innovator.newItem(_foundItemType, "get");
-                        docQuery.setID(itemId);
-                        docQuery.setAttribute("select", "id,item_number,name");
-
-                        Item docFileRel = docQuery.createRelationship("Document File", "get");
-                        docFileRel.setAttribute("select", "id,related_id");
-
-                        Item fileQuery = docFileRel.createRelatedItem("File", "get");
-                        fileQuery.setAttribute("select", "id,filename");
-
-                        Item docResult = docQuery.apply();
-
-                        if (docResult != null && !docResult.isError())
-                        {
-                            Item rels = docResult.getRelationships("Document File");
-                            if (rels != null && !rels.isError() && rels.getItemCount() > 0)
+                            fileId = docFileResult.getItemByIndex(0).getProperty("related_id", "");
+                            if (!string.IsNullOrEmpty(fileId))
                             {
-                                Item relItem = rels.getItemByIndex(0);
-                                if (relItem != null)
+                                Item fileItem = innovator.getItemById("File", fileId);
+                                if (fileItem != null && !fileItem.isError())
                                 {
-                                    Item fileItem = relItem.getRelatedItem();
-                                    if (fileItem != null && !fileItem.isError())
-                                    {
-                                        fileId = fileItem.getID();
-                                        fileName = fileItem.getProperty("filename", "");
-                                    }
+                                    fileName = fileItem.getProperty("filename", "");
                                 }
                             }
                         }
                     }
                     catch { }
+                }
+                else
+                {
+                    // For CAD items, try native_file property first
+                    fileId = item.getProperty("native_file", "");
+                    if (!string.IsNullOrEmpty(fileId))
+                    {
+                        try
+                        {
+                            Item fileItem = innovator.getItemById("File", fileId);
+                            if (fileItem != null && !fileItem.isError())
+                            {
+                                fileName = fileItem.getProperty("filename", "");
+                            }
+                        }
+                        catch { }
+                    }
+
+                    // If no file yet, try CAD Document relationship
+                    if (string.IsNullOrEmpty(fileId) || string.IsNullOrEmpty(fileName))
+                    {
+                        try
+                        {
+                            Item cadDocQuery = innovator.newItem("CAD Document", "get");
+                            cadDocQuery.setAttribute("select", "related_id");
+                            cadDocQuery.setProperty("source_id", itemId);
+                            cadDocQuery.setAttribute("maxRecords", "1");
+                            cadDocQuery.setAttribute("orderBy", "created_on DESC");
+                            Item cadDocResult = cadDocQuery.apply();
+
+                            if (!cadDocResult.isError() && cadDocResult.getItemCount() > 0)
+                            {
+                                fileId = cadDocResult.getItemByIndex(0).getProperty("related_id", "");
+                                if (!string.IsNullOrEmpty(fileId))
+                                {
+                                    Item fileItem = innovator.getItemById("File", fileId);
+                                    if (fileItem != null && !fileItem.isError())
+                                    {
+                                        fileName = fileItem.getProperty("filename", "");
+                                    }
+                                }
+                            }
+                        }
+                        catch { }
+                    }
                 }
 
                 // Default filename if none found
@@ -713,6 +745,13 @@ namespace ArasCLI
         {
             lblStatus.Text = message;
             lblStatus.ForeColor = color;
+        }
+
+        // Helper class to store search result info
+        private class SearchResultInfo
+        {
+            public string ItemId { get; set; }
+            public string ItemType { get; set; }
         }
     }
 }

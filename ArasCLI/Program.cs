@@ -228,6 +228,7 @@ namespace ArasCLI
             bool sendToMode = false;
             bool catiaLoginMode = false;
             bool catiaCheckOutMode = false;
+            bool catiaCheckInMode = false;
             string sendToFile = null;
 
             // Check if any argument is a file path (Windows Send To passes file path directly)
@@ -248,6 +249,10 @@ namespace ArasCLI
                 else if (arg == "--catia-checkout" || arg == "-catia-checkout")
                 {
                     catiaCheckOutMode = true;
+                }
+                else if (arg == "--catia-checkin" || arg == "-catia-checkin")
+                {
+                    catiaCheckInMode = true;
                 }
                 else if (!arg.StartsWith("-") && File.Exists(arg))
                 {
@@ -281,6 +286,19 @@ namespace ArasCLI
                 using (var checkOutForm = new CatiaCheckOutForm())
                 {
                     checkOutForm.ShowDialog();
+                }
+                return;
+            }
+
+            // CATIA Check-In mode - show check-in form
+            if (catiaCheckInMode)
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+
+                using (var checkInForm = new CatiaCheckInForm())
+                {
+                    checkInForm.ShowDialog();
                 }
                 return;
             }
