@@ -1,0 +1,64 @@
+' Aras Innovator Toolbar Startup Script
+' This script creates the Aras toolbar automatically when CATIA starts
+'
+' Installation:
+' 1. Copy this file to a location CATIA can access
+' 2. In CATIA: Tools -> Options -> General -> Parameters and Measure -> Macros
+' 3. Add this script path to "Macro libraries"
+' 4. Enable "Execute at startup" or add to startup macros
+
+Sub CATMain()
+    On Error Resume Next
+
+    Dim CATIA As Object
+    Set CATIA = GetObject(, "CATIA.Application")
+
+    If CATIA Is Nothing Then
+        Exit Sub
+    End If
+
+    ' Create or get the Aras toolbar
+    Dim commandBars As Object
+    Set commandBars = CATIA.CommandBars
+
+    If commandBars Is Nothing Then
+        Exit Sub
+    End If
+
+    ' Check if Aras toolbar already exists
+    Dim arasToolbar As Object
+    Dim toolbarExists As Boolean
+    toolbarExists = False
+
+    Dim i As Integer
+    For i = 1 To commandBars.Count
+        If commandBars.Item(i).Name = "Aras Innovator" Then
+            toolbarExists = True
+            Set arasToolbar = commandBars.Item(i)
+            Exit For
+        End If
+    Next i
+
+    ' If toolbar doesn't exist, we need to inform the user
+    ' Unfortunately, creating custom toolbars with external commands via script is limited
+    ' The toolbar needs to be created manually through Tools -> Customize
+
+    If Not toolbarExists Then
+        ' Show a reminder to set up the toolbar
+        MsgBox "Aras Innovator toolbar not found." & vbCrLf & vbCrLf & _
+               "To create the toolbar:" & vbCrLf & _
+               "1. Go to Tools -> Customize" & vbCrLf & _
+               "2. Click 'New...' to create toolbar 'Aras Innovator'" & vbCrLf & _
+               "3. Add macros from ArasModule" & vbCrLf & vbCrLf & _
+               "Or import the toolbar from:" & vbCrLf & _
+               "ArasCatiaAddin\CatiaToolbar\ArasToolbar.CATSettings", _
+               vbInformation, "Aras Innovator Setup"
+    Else
+        ' Make sure the toolbar is visible
+        arasToolbar.Visible = True
+    End If
+
+    Set arasToolbar = Nothing
+    Set commandBars = Nothing
+    Set CATIA = Nothing
+End Sub

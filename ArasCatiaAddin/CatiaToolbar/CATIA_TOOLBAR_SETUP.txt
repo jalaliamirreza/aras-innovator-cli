@@ -1,0 +1,95 @@
+================================================================================
+                    ARAS INNOVATOR CATIA TOOLBAR SETUP
+================================================================================
+
+PROBLEM: Toolbar disappears when opening files or switching workbenches
+
+SOLUTION: Make the toolbar persistent across all workbenches
+
+================================================================================
+METHOD 1: PERMANENT TOOLBAR SETUP (Recommended)
+================================================================================
+
+1. Open CATIA V5
+
+2. Create the toolbar in EACH workbench you use:
+   a. Switch to Part Design workbench (for CATPart files)
+   b. Tools -> Customize -> Toolbars tab
+   c. Click "New..." -> Name: "Aras Innovator"
+   d. Go to Commands tab
+   e. Select "Macros" category
+   f. Drag these macros to your new toolbar:
+      - ArasModule.ArasLogin
+      - ArasModule.ArasCheckIn
+      - ArasModule.ArasCheckOut
+      - ArasModule.ArasSettings
+   g. Click "Close"
+   h. REPEAT for Assembly Design workbench (for CATProduct files)
+
+3. Save settings:
+   a. Tools -> Options -> General -> General
+   b. Make sure "Automatic backup" settings are configured
+   c. Close CATIA normally (File -> Exit)
+
+================================================================================
+METHOD 2: EXPORT/IMPORT TOOLBAR (Quick Recovery)
+================================================================================
+
+After creating toolbar once:
+
+1. Export:
+   - Tools -> Customize
+   - Click "Export..."
+   - Save as "ArasToolbar.CATSettings" in this folder
+
+2. Import (when toolbar disappears):
+   - Tools -> Customize
+   - Click "Import..."
+   - Select "ArasToolbar.CATSettings"
+
+================================================================================
+METHOD 3: ENVIRONMENT VARIABLE (IT/Admin Setup)
+================================================================================
+
+For enterprise deployment, set the CATStartup environment variable to run
+a macro that shows the toolbar automatically.
+
+1. Create environment variable:
+   CATStartup = D:\path\to\ArasCatiaAddin\CatiaToolbar\ArasToolbarStartup.CATScript
+
+2. Or add to CATIA startup macros:
+   - Tools -> Options -> General -> Parameters and Measure
+   - Macros tab
+   - Add ArasToolbarStartup.CATScript to "Execute at startup"
+
+================================================================================
+METHOD 4: QUICK FIX (Temporary)
+================================================================================
+
+When toolbar disappears:
+1. Tools -> Customize -> Toolbars tab
+2. Check the box next to "Aras Innovator"
+3. Click "Close"
+
+================================================================================
+VBA MODULE LOCATION
+================================================================================
+
+The VBA macros are in:
+  ArasCatiaAddin\CatiaToolbar\ArasModule.bas
+
+Import this module in CATIA:
+1. Tools -> Macro -> Macros...
+2. Click "Macro libraries..."
+3. Add new library, import ArasModule.bas
+
+================================================================================
+ARASCLI EXECUTABLE LOCATION
+================================================================================
+
+The macros expect ArasCLI.exe at:
+  D:\Worklab\SAP\Behran\PLM\Codes\v2\aras-innovator-cli\ArasCLI\bin\Debug\ArasCLI.exe
+
+If installed elsewhere, update ARASCLI_PATH in ArasModule.bas
+
+================================================================================

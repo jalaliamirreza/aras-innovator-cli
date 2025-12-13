@@ -462,6 +462,44 @@ namespace ArasCLI
                     throw new Exception("Not connected to Aras. Please login first.");
                 }
 
+                // Check if item is already locked by someone else
+                SetStatus($"Checking lock status for {itemNumber}...", Color.Orange);
+                Application.DoEvents();
+
+                Item checkItem = innovator.getItemById(_foundItemType, itemId);
+                if (checkItem != null && !checkItem.isError())
+                {
+                    string lockedById = checkItem.getProperty("locked_by_id", "");
+                    if (!string.IsNullOrEmpty(lockedById))
+                    {
+                        string currentUserId = innovator.getUserID();
+                        if (lockedById != currentUserId)
+                        {
+                            // Get the name of the user who locked it
+                            Item lockedByUser = innovator.getItemById("User", lockedById);
+                            string lockedByName = lockedByUser != null && !lockedByUser.isError()
+                                ? lockedByUser.getProperty("keyed_name", lockedById)
+                                : lockedById;
+
+                            throw new Exception($"Item is locked by: {lockedByName}\n\nCannot check out an item that is locked by another user.");
+                        }
+                    }
+                }
+
+                // Lock the item in Aras (same pattern as ArasService.LockItem)
+                SetStatus($"Locking {itemNumber} in Aras...", Color.Orange);
+                Application.DoEvents();
+
+                Item lockItem = innovator.newItem(_foundItemType, "lock");
+                lockItem.setID(itemId);
+                Item lockResult = lockItem.apply();
+
+                if (lockResult.isError())
+                {
+                    string lockError = lockResult.getErrorString();
+                    throw new Exception($"Failed to lock item: {lockError}");
+                }
+
                 // Get the item using the type that was found during search
                 Item item = innovator.getItemById(_foundItemType, itemId);
                 if (item == null)
@@ -621,33 +659,33 @@ namespace ArasCLI
                     if (openedInCatia)
                     {
                         MessageBox.Show(
-                            $"Item: {itemNumber}\nName: {itemName}\nFile: {fileName}\n\nFile downloaded and opened in CATIA.",
+                            $"Item: {itemNumber}\nName: {itemName}\nFile: {fileName}\n\nItem locked in Aras.\nFile downloaded and opened in CATIA.",
                             "Check Out Complete",
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
 
-                        SetStatus($"Checked out: {itemNumber} - Opened in CATIA", Color.Green);
+                        SetStatus($"Checked out & locked: {itemNumber} - Opened in CATIA", Color.Green);
                     }
                     else
                     {
                         MessageBox.Show(
-                            $"Item: {itemNumber}\nName: {itemName}\nFile: {fileName}\n\nFile downloaded to:\n{localFilePath}\n\nCould not open in CATIA: {openError}",
+                            $"Item: {itemNumber}\nName: {itemName}\nFile: {fileName}\n\nItem locked in Aras.\nFile downloaded to:\n{localFilePath}\n\nCould not open in CATIA: {openError}",
                             "Check Out Complete",
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
 
-                        SetStatus($"Checked out: {itemNumber} - File downloaded", Color.Green);
+                        SetStatus($"Checked out & locked: {itemNumber} - File downloaded", Color.Green);
                     }
                 }
                 else
                 {
                     MessageBox.Show(
-                        $"Item: {itemNumber}\nName: {itemName}\n\nItem registered for checkout.\nNo file attached or download not available.",
+                        $"Item: {itemNumber}\nName: {itemName}\n\nItem locked in Aras.\nNo file attached or download not available.",
                         "Check Out",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information);
 
-                    SetStatus($"Checked out: {itemNumber} (no file)", Color.Orange);
+                    SetStatus($"Checked out & locked: {itemNumber} (no file)", Color.Orange);
                 }
 
                 // Save workspace to config
