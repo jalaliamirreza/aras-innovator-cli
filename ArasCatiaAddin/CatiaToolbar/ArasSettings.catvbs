@@ -1,0 +1,21 @@
+' Aras Settings Button
+Const ARASCLI_PATH = "D:\Worklab\SAP\Behran\PLM\Codes\v2\aras-innovator-cli\ArasCLI\bin\Debug\ArasCLI.exe"
+
+Sub CATMain()
+    Dim fso, msg
+    Set fso = CreateObject("Scripting.FileSystemObject")
+
+    msg = "Aras Integration Settings" & vbCrLf & vbCrLf
+    msg = msg & "ArasCLI Path:" & vbCrLf
+    msg = msg & ARASCLI_PATH & vbCrLf & vbCrLf
+
+    If fso.FileExists(ARASCLI_PATH) Then
+        msg = msg & "Status: ArasCLI Found"
+    Else
+        msg = msg & "Status: ArasCLI NOT Found!" & vbCrLf
+        msg = msg & "Please build ArasCLI or update path."
+    End If
+
+    MsgBox msg, vbInformation, "Aras Settings"
+    Set fso = Nothing
+End Sub

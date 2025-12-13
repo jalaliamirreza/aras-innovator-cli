@@ -1,0 +1,50 @@
+' Aras BOM Sync Button
+Const ARASCLI_PATH = "D:\Worklab\SAP\Behran\PLM\Codes\v2\aras-innovator-cli\ArasCLI\bin\Debug\ArasCLI.exe"
+
+Sub CATMain()
+    Dim fso, shell, doc, docType
+    Set fso = CreateObject("Scripting.FileSystemObject")
+
+    If Not fso.FileExists(ARASCLI_PATH) Then
+        MsgBox "ArasCLI not found at:" & vbCrLf & ARASCLI_PATH, vbExclamation, "BOM Sync"
+        Exit Sub
+    End If
+
+    ' Check if document is open
+    If CATIA.Documents.Count = 0 Then
+        MsgBox "No document is open in CATIA.", vbExclamation, "BOM Sync"
+        Exit Sub
+    End If
+
+    Set doc = CATIA.ActiveDocument
+    docType = TypeName(doc)
+
+    If docType <> "ProductDocument" Then
+        MsgBox "BOM Sync requires a CATProduct (assembly)." & vbCrLf & vbCrLf & _
+               "Current document type: " & docType, vbExclamation, "BOM Sync"
+        Exit Sub
+    End If
+
+    ' Show BOM info
+    Dim prod, products, info, i
+    Set prod = doc.Product
+    Set products = prod.Products
+
+    info = "Assembly: " & prod.PartNumber & vbCrLf
+    info = info & "Components: " & products.Count & vbCrLf & vbCrLf
+
+    For i = 1 To products.Count
+        If i > 10 Then
+            info = info & "... and " & (products.Count - 10) & " more" & vbCrLf
+            Exit For
+        End If
+        info = info & "- " & products.Item(i).PartNumber & vbCrLf
+    Next
+
+    MsgBox info & vbCrLf & "BOM sync to Aras coming soon.", vbInformation, "BOM Sync"
+
+    Set products = Nothing
+    Set prod = Nothing
+    Set doc = Nothing
+    Set fso = Nothing
+End Sub

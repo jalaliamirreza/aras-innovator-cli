@@ -1,0 +1,40 @@
+' Aras Check-In Button
+Const ARASCLI_PATH = "D:\Worklab\SAP\Behran\PLM\Codes\v2\aras-innovator-cli\ArasCLI\bin\Debug\ArasCLI.exe"
+
+Sub CATMain()
+    Dim fso, shell, doc, docPath
+    Set fso = CreateObject("Scripting.FileSystemObject")
+
+    If Not fso.FileExists(ARASCLI_PATH) Then
+        MsgBox "ArasCLI not found at:" & vbCrLf & ARASCLI_PATH, vbExclamation, "Check In"
+        Exit Sub
+    End If
+
+    ' Check if document is open
+    If CATIA.Documents.Count = 0 Then
+        MsgBox "No document is open in CATIA.", vbExclamation, "Check In"
+        Exit Sub
+    End If
+
+    Set doc = CATIA.ActiveDocument
+
+    ' Save if needed
+    If doc.Saved = False Then
+        Dim result
+        result = MsgBox("Document has unsaved changes. Save before check-in?", vbYesNoCancel + vbQuestion, "Check In")
+        If result = vbCancel Then Exit Sub
+        If result = vbYes Then doc.Save
+    End If
+
+    docPath = doc.FullName
+    If docPath = "" Then
+        MsgBox "Please save the document first.", vbExclamation, "Check In"
+        Exit Sub
+    End If
+
+    Set shell = CreateObject("WScript.Shell")
+    shell.Run """" & ARASCLI_PATH & """ """ & docPath & """", 1, False
+    Set shell = Nothing
+    Set doc = Nothing
+    Set fso = Nothing
+End Sub

@@ -1,0 +1,19 @@
+' Aras Get Latest Button
+Const ARASCLI_PATH = "D:\Worklab\SAP\Behran\PLM\Codes\v2\aras-innovator-cli\ArasCLI\bin\Debug\ArasCLI.exe"
+
+Sub CATMain()
+    Dim fso, shell
+    Set fso = CreateObject("Scripting.FileSystemObject")
+
+    If Not fso.FileExists(ARASCLI_PATH) Then
+        MsgBox "ArasCLI not found at:" & vbCrLf & ARASCLI_PATH, vbExclamation, "Get Latest"
+        Exit Sub
+    End If
+
+    Set shell = CreateObject("WScript.Shell")
+    shell.Run """" & ARASCLI_PATH & """", 1, False
+    Set shell = Nothing
+    Set fso = Nothing
+
+    MsgBox "Use Aras GUI to search and download latest version.", vbInformation, "Get Latest"
+End Sub

@@ -1,0 +1,60 @@
+' ============================================
+' Aras Toolbar Setup Script for CATIA V5
+' ============================================
+' Run this macro once to create the Aras Integration toolbar
+' with all buttons configured.
+'
+' After running, the toolbar will appear with 7 buttons.
+' ============================================
+
+Sub CATMain()
+    On Error Resume Next
+
+    MsgBox "This will create the Aras Integration toolbar." & vbCrLf & vbCrLf & _
+           "Note: CATIA V5 does not support programmatic toolbar creation." & vbCrLf & vbCrLf & _
+           "Please follow these manual steps:" & vbCrLf & vbCrLf & _
+           "1. Tools > Customize..." & vbCrLf & _
+           "2. Toolbars tab > New... > Name: 'Aras Integration'" & vbCrLf & _
+           "3. Commands tab > Category: 'Macros'" & vbCrLf & _
+           "4. Drag these macros to the toolbar:" & vbCrLf & _
+           "   - ArasLogin" & vbCrLf & _
+           "   - ArasCheckIn" & vbCrLf & _
+           "   - ArasCheckOut" & vbCrLf & _
+           "   - ArasGetLatest" & vbCrLf & _
+           "   - ArasSearch" & vbCrLf & _
+           "   - ArasBOMSync" & vbCrLf & _
+           "   - ArasSettings" & vbCrLf & vbCrLf & _
+           "Click OK to test the connection to ArasCLI.", _
+           vbInformation, "Aras Toolbar Setup"
+
+    ' Test if ArasCLI exists
+    Dim fso
+    Set fso = CreateObject("Scripting.FileSystemObject")
+
+    Dim cliPath
+    cliPath = "D:\Worklab\SAP\Behran\PLM\Codes\v2\aras-innovator-cli\ArasCLI\bin\Debug\ArasCLI.exe"
+
+    If fso.FileExists(cliPath) Then
+        MsgBox "ArasCLI found at:" & vbCrLf & cliPath & vbCrLf & vbCrLf & _
+               "Setup is ready! Create the toolbar manually using the steps above.", _
+               vbInformation, "Setup Complete"
+
+        ' Optionally launch ArasCLI to verify it works
+        Dim result
+        result = MsgBox("Would you like to launch ArasCLI now to test?", _
+                       vbYesNo + vbQuestion, "Test ArasCLI")
+
+        If result = vbYes Then
+            Dim shell
+            Set shell = CreateObject("WScript.Shell")
+            shell.Run """" & cliPath & """", 1, False
+            Set shell = Nothing
+        End If
+    Else
+        MsgBox "WARNING: ArasCLI not found at:" & vbCrLf & cliPath & vbCrLf & vbCrLf & _
+               "Please build the ArasCLI project first.", _
+               vbExclamation, "Setup Warning"
+    End If
+
+    Set fso = Nothing
+End Sub
