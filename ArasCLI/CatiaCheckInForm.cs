@@ -16,6 +16,7 @@ namespace ArasCLI
         private ListView lvCheckedOut;
         private Button btnRefresh;
         private Button btnCheckIn;
+        private Button btnCheckInReview;
         private Button btnCancel;
         private Label lblStatus;
         private Panel statusPanel;
@@ -131,8 +132,8 @@ namespace ArasCLI
             btnCheckIn = new Button
             {
                 Text = "Check In",
-                Location = new Point(leftMargin + formWidth - 220, yPos),
-                Size = new Size(100, 35),
+                Location = new Point(leftMargin + formWidth - 380, yPos),
+                Size = new Size(110, 35),
                 BackColor = Color.FromArgb(40, 167, 69),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -141,6 +142,20 @@ namespace ArasCLI
             };
             btnCheckIn.FlatAppearance.BorderSize = 0;
             btnCheckIn.Click += BtnCheckIn_Click;
+
+            btnCheckInReview = new Button
+            {
+                Text = "Check In && Review",
+                Location = new Point(leftMargin + formWidth - 260, yPos),
+                Size = new Size(140, 35),
+                BackColor = Color.FromArgb(0, 123, 255),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand,
+                Enabled = false
+            };
+            btnCheckInReview.FlatAppearance.BorderSize = 0;
+            btnCheckInReview.Click += BtnCheckInReview_Click;
 
             btnCancel = new Button
             {
@@ -156,6 +171,7 @@ namespace ArasCLI
             btnCancel.Click += BtnCancel_Click;
 
             this.Controls.Add(btnCheckIn);
+            this.Controls.Add(btnCheckInReview);
             this.Controls.Add(btnCancel);
             yPos += 50;
 
@@ -421,7 +437,7 @@ namespace ArasCLI
 
         private void LvCheckedOut_ItemChecked(object sender, ItemCheckedEventArgs e)
         {
-            // Enable check-in button if any item is checked
+            // Enable check-in buttons if any item is checked
             bool anyChecked = false;
             foreach (ListViewItem item in lvCheckedOut.Items)
             {
@@ -432,9 +448,20 @@ namespace ArasCLI
                 }
             }
             btnCheckIn.Enabled = anyChecked;
+            btnCheckInReview.Enabled = anyChecked;
         }
 
         private void BtnCheckIn_Click(object sender, EventArgs e)
+        {
+            PerformCheckIn(promoteToReview: false);
+        }
+
+        private void BtnCheckInReview_Click(object sender, EventArgs e)
+        {
+            PerformCheckIn(promoteToReview: true);
+        }
+
+        private void PerformCheckIn(bool promoteToReview)
         {
             if (!SessionManager.HasActiveSession)
             {
@@ -720,6 +747,19 @@ namespace ArasCLI
                             throw new Exception("Failed to unlock: " + unlockResult.getErrorString());
                         }
 
+                        // Promote to "In Review" if requested
+                        if (promoteToReview)
+                        {
+                            SetStatus($"Promoting {info.ItemNumber} to In Review...", Color.Orange);
+                            Application.DoEvents();
+
+                            bool promoted = PromoteToInReview(innovator, info.ItemType, info.ItemId, info.ItemNumber);
+                            if (promoted)
+                            {
+                                info.State = "In Review";
+                            }
+                        }
+
                         // Close in CATIA if requested
                         if (chkCloseInCatia.Checked && !string.IsNullOrEmpty(info.LocalFilePath))
                         {
@@ -811,15 +851,26 @@ namespace ArasCLI
                 // Get the new item ID
                 string newItemId = versionResult.getID();
 
-                // Lock the new revision for editing
-                Item lockItem = innovator.newItem(itemType, "lock");
-                lockItem.setID(newItemId);
-                Item lockResult = lockItem.apply();
+                // Check if new revision is already locked (version action may auto-lock)
+                Item checkItem = innovator.getItemById(itemType, newItemId);
+                string lockedById = checkItem != null && !checkItem.isError()
+                    ? checkItem.getProperty("locked_by_id", "")
+                    : "";
+                string currentUserId = innovator.getUserID();
 
-                if (lockResult.isError())
+                // Only lock if not already locked by us
+                if (string.IsNullOrEmpty(lockedById) || lockedById != currentUserId)
                 {
-                    string error = lockResult.getErrorString();
-                    MessageBox.Show($"New revision created but failed to lock:\n\n{error}", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    Item lockItem = innovator.newItem(itemType, "lock");
+                    lockItem.setID(newItemId);
+                    Item lockResult = lockItem.apply();
+
+                    // Ignore "already locked" errors - that's fine
+                    if (lockResult.isError() && !lockResult.getErrorString().Contains("AlreadyLocked"))
+                    {
+                        string error = lockResult.getErrorString();
+                        MessageBox.Show($"New revision created but failed to lock:\n\n{error}", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
                 }
 
                 // Get the new revision letter
@@ -838,6 +889,74 @@ namespace ArasCLI
             {
                 MessageBox.Show($"Error creating new revision:\n\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return null;
+            }
+        }
+
+        private bool PromoteToInReview(Innovator innovator, string itemType, string itemId, string itemNumber)
+        {
+            try
+            {
+                // Get the item first to find its lifecycle and current state
+                Item item = innovator.getItemById(itemType, itemId);
+                if (item == null || item.isError())
+                {
+                    MessageBox.Show("Failed to get item for promotion.", "Promote Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return false;
+                }
+
+                // Use the Life Cycle Transition to promote
+                // Method 1: Use applyItem with action="promoteItem"
+                Item promoteItem = innovator.newItem(itemType, "promoteItem");
+                promoteItem.setID(itemId);
+                promoteItem.setProperty("state", "In Review");
+                Item promoteResult = promoteItem.apply();
+
+                if (!promoteResult.isError())
+                {
+                    return true;
+                }
+
+                // Method 2: Try using edit to change state directly (if allowed by lifecycle)
+                Item editItem = innovator.newItem(itemType, "edit");
+                editItem.setID(itemId);
+                editItem.setProperty("state", "In Review");
+                Item editResult = editItem.apply();
+
+                if (!editResult.isError())
+                {
+                    return true;
+                }
+
+                // Method 3: Try using the Life Cycle Transition relationship
+                string currentState = item.getProperty("current_state", "");
+                if (string.IsNullOrEmpty(currentState))
+                {
+                    currentState = item.getProperty("state", "");
+                }
+
+                // Apply AML to promote
+                string aml = $@"<AML>
+                    <Item type='{itemType}' id='{itemId}' action='promoteItem'>
+                        <state>In Review</state>
+                    </Item>
+                </AML>";
+
+                Item amlResult = innovator.applyAML(aml);
+                if (!amlResult.isError())
+                {
+                    return true;
+                }
+
+                string error = promoteResult.getErrorString();
+                MessageBox.Show($"Failed to promote to In Review:\n\n{error}\n\nThe file was uploaded successfully but state was not changed.",
+                    "Promote Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error promoting to In Review:\n\n{ex.Message}\n\nThe file was uploaded successfully but state was not changed.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
             }
         }
 
