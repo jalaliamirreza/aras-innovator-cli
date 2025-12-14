@@ -487,23 +487,65 @@ namespace ArasCLI
                         string currentState = info.State ?? "";
                         if (currentState != "Preliminary" && !string.IsNullOrEmpty(currentState))
                         {
-                            string errorMsg;
-                            switch (currentState)
+                            if (currentState == "Released")
                             {
-                                case "Released":
-                                    errorMsg = "Cannot check-in. Document is Released. Create new revision in Aras first.";
-                                    break;
-                                case "In Review":
-                                    errorMsg = "Cannot check-in. Document is In Review.";
-                                    break;
-                                case "Obsolete":
-                                    errorMsg = "Cannot check-in. Document is Obsolete.";
-                                    break;
-                                default:
-                                    errorMsg = $"Cannot check-in. Document is in '{currentState}' state.";
-                                    break;
+                                // Offer to create a new revision
+                                var createRevResult = MessageBox.Show(
+                                    $"Document '{info.ItemNumber}' Rev {info.Revision} is Released.\n\n" +
+                                    "Do you want to create a new revision to check in your changes?",
+                                    "Create New Revision?",
+                                    MessageBoxButtons.YesNo,
+                                    MessageBoxIcon.Question);
+
+                                if (createRevResult == DialogResult.Yes)
+                                {
+                                    SetStatus($"Creating new revision for {info.ItemNumber}...", Color.Orange);
+                                    Application.DoEvents();
+
+                                    // Create new revision using version action
+                                    string newItemId = CreateNewRevision(innovator, info.ItemType, info.ItemId, info.ItemNumber);
+
+                                    if (!string.IsNullOrEmpty(newItemId))
+                                    {
+                                        // Update info to point to new revision
+                                        info.ItemId = newItemId;
+                                        info.OriginalFileId = ""; // New revision has no file yet
+
+                                        // Get new revision info
+                                        Item newItem = innovator.getItemById(info.ItemType, newItemId);
+                                        if (newItem != null && !newItem.isError())
+                                        {
+                                            info.Revision = newItem.getProperty("major_rev", "");
+                                            info.State = newItem.getProperty("state", "Preliminary");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        throw new Exception("Failed to create new revision.");
+                                    }
+                                }
+                                else
+                                {
+                                    throw new Exception("Check-in cancelled. Document is Released.");
+                                }
                             }
-                            throw new Exception(errorMsg);
+                            else
+                            {
+                                string errorMsg;
+                                switch (currentState)
+                                {
+                                    case "In Review":
+                                        errorMsg = "Cannot check-in. Document is In Review.";
+                                        break;
+                                    case "Obsolete":
+                                        errorMsg = "Cannot check-in. Document is Obsolete.";
+                                        break;
+                                    default:
+                                        errorMsg = $"Cannot check-in. Document is in '{currentState}' state.";
+                                        break;
+                                }
+                                throw new Exception(errorMsg);
+                            }
                         }
 
                         // Upload new file if local file exists
@@ -742,6 +784,60 @@ namespace ArasCLI
             {
                 progressBar.Visible = false;
                 btnCheckIn.Enabled = true;
+            }
+        }
+
+        private string CreateNewRevision(Innovator innovator, string itemType, string itemId, string itemNumber)
+        {
+            try
+            {
+                // First, unlock the current item (it was locked during checkout)
+                Item unlockItem = innovator.newItem(itemType, "unlock");
+                unlockItem.setID(itemId);
+                unlockItem.apply(); // Ignore error - might not be locked
+
+                // Create new revision using the "version" action
+                Item versionItem = innovator.newItem(itemType, "version");
+                versionItem.setID(itemId);
+                Item versionResult = versionItem.apply();
+
+                if (versionResult.isError())
+                {
+                    string error = versionResult.getErrorString();
+                    MessageBox.Show($"Failed to create new revision:\n\n{error}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return null;
+                }
+
+                // Get the new item ID
+                string newItemId = versionResult.getID();
+
+                // Lock the new revision for editing
+                Item lockItem = innovator.newItem(itemType, "lock");
+                lockItem.setID(newItemId);
+                Item lockResult = lockItem.apply();
+
+                if (lockResult.isError())
+                {
+                    string error = lockResult.getErrorString();
+                    MessageBox.Show($"New revision created but failed to lock:\n\n{error}", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+
+                // Get the new revision letter
+                Item newItem = innovator.getItemById(itemType, newItemId);
+                string newRev = newItem != null && !newItem.isError() ? newItem.getProperty("major_rev", "?") : "?";
+
+                MessageBox.Show(
+                    $"New revision created successfully!\n\nDocument: {itemNumber}\nNew Revision: {newRev}\n\nProceeding with file upload...",
+                    "New Revision Created",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
+                return newItemId;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error creating new revision:\n\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return null;
             }
         }
 
