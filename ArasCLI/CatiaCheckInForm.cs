@@ -757,6 +757,33 @@ namespace ArasCLI
                             if (promoted)
                             {
                                 info.State = "In Review";
+
+                                // Send email notification to reviewer
+                                SetStatus($"Sending review notification...", Color.Orange);
+                                Application.DoEvents();
+
+                                var emailService = new EmailService(_configManager.Config);
+                                if (emailService.IsConfigured())
+                                {
+                                    bool emailSent = emailService.SendReviewNotification(
+                                        info.ItemNumber,
+                                        info.ItemName,
+                                        info.Revision,
+                                        SessionManager.Username,
+                                        info.ItemId,
+                                        info.ItemType,
+                                        info.LocalFilePath);
+
+                                    if (!emailSent)
+                                    {
+                                        // Email failed but don't fail the check-in
+                                        MessageBox.Show(
+                                            $"Document promoted to In Review but email notification failed.\n\nError: {emailService.LastError}\n\nPlease notify the reviewer manually.",
+                                            "Email Notification Failed",
+                                            MessageBoxButtons.OK,
+                                            MessageBoxIcon.Warning);
+                                    }
+                                }
                             }
                         }
 

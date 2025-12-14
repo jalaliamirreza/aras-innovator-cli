@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" ArasCLI.sln /t:Build /p:Configuration=Debug /verbosity:minimal)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/MSBuild.exe\" ArasCLI.sln -t:Build -p:Configuration=Debug -verbosity:minimal)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/MSBuild.exe\" \"d:/Worklab/SAP/Behran/PLM/Codes/v2/aras-innovator-cli/ArasCLI.sln\" /t:Build /p:Configuration=Debug /verbosity:minimal)",
+      "Bash(\"C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" \"d:/Worklab/SAP/Behran/PLM/Codes/v2/aras-innovator-cli/ArasCLI.sln\" /t:Build /p:Configuration=Debug /verbosity:minimal)",
+      "Bash(\"/c/Program Files (x86)/Microsoft Visual Studio/2019/Community/MSBuild/Current/Bin/MSBuild.exe\" \"d:/Worklab/SAP/Behran/PLM/Codes/v2/aras-innovator-cli/ArasCLI.sln\" /t:Build /p:Configuration=Debug /verbosity:minimal)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" \"d:/Worklab/SAP/Behran/PLM/Codes/v2/aras-innovator-cli/ArasCLI.sln\" /t:Build /p:Configuration=Debug /verbosity:minimal)",
+      "Bash(cmd.exe:*)",
+      "Bash(cat:*)",
+      "Bash(dotnet --version:*)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/MSBuild.exe\" ArasCLI.sln -t:Build -p:Configuration=Debug)",
+      "Bash(git add:*)",
+      "Bash(git reset:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(powershell:*)",
+      "Bash(dotnet build:*)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/MSBuild.exe\" \"d:/Worklab/SAP/Behran/PLM/Codes/v2/aras-innovator-cli/ArasCLI.sln\" -t:Build -p:Configuration=Debug -verbosity:minimal)",
+      "Bash(curl:*)",
+      "Bash(git -C \"d:/Worklab/SAP/Behran/PLM/Codes/v2/aras-innovator-cli\" status)",
+      "Bash(git -C \"d:/Worklab/SAP/Behran/PLM/Codes/v2/aras-innovator-cli\" diff ArasCLI/Services/EmailService.cs)",
+      "Bash(git -C \"d:/Worklab/SAP/Behran/PLM/Codes/v2/aras-innovator-cli\" log -3 --oneline)"
+    ]
+  }
+}

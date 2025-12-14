@@ -122,6 +122,18 @@ namespace ArasCLI.Services
         // Recent Files
         public string[] RecentFiles { get; set; } = new string[0];
 
+        // SMTP Email Settings
+        public string SmtpServer { get; set; } = "mail.besterun.com";
+        public int SmtpPort { get; set; } = 587;
+        public string SmtpUsername { get; set; } = "plm@besterun.com";
+        public string SmtpPassword { get; set; } = "Amir1234";
+        public bool SmtpUseSsl { get; set; } = true;
+        public string ReviewerEmail { get; set; } = "amir.jalali@besterun.com";
+        public string SenderEmail { get; set; } = "plm@besterun.com";
+
+        // CWS API Key for one-click approval from email
+        public string ApprovalApiKey { get; set; } = "APIKEY_SW5ub3ZhdG9yU29sdXRpb25zLm5YWEc2Rk94V0U0NUxKUW5JUFVyRklJamF5dkgycnVa";
+
         // Window Settings
         public int WindowWidth { get; set; } = 800;
         public int WindowHeight { get; set; } = 600;

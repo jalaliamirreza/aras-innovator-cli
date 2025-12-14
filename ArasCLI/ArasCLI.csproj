@@ -186,6 +186,7 @@
     <Compile Include="Services\ArasService.cs" />
     <Compile Include="Services\CatiaService.cs" />
     <Compile Include="Services\ConfigManager.cs" />
+    <Compile Include="Services\EmailService.cs" />
     <Compile Include="Services\SessionManager.cs" />
     <Compile Include="Properties\Settings.Designer.cs">
       <AutoGen>True</AutoGen>

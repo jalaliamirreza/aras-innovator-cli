@@ -201,3 +201,4 @@ https://github.com/jalaliamirreza/aras-innovator-cli
 - یکپارچگی Send To
 - ذخیره تنظیمات
 
+

@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>راهنمای برنامه‌ریزی تولید - Aras Innovator CLI</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2.5cm;
+        }
+        body {
+            font-family: 'Tahoma', 'Arial', sans-serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            direction: rtl;
+            text-align: right;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            font-size: 24pt;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-top: 30px;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #34495e;
+            font-size: 18pt;
+            border-bottom: 2px solid #95a5a6;
+            padding-bottom: 8px;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        h3 {
+            color: #555;
+            font-size: 14pt;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        p {
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+        ul, ol {
+            margin-right: 30px;
+            margin-bottom: 15px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            direction: rtl;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: right;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .highlight {
+            background-color: #fff3cd;
+            padding: 15px;
+            border-right: 4px solid #ffc107;
+            margin: 20px 0;
+        }
+        .info-box {
+            background-color: #d1ecf1;
+            padding: 15px;
+            border-right: 4px solid #17a2b8;
+            margin: 20px 0;
+        }
+        .warning-box {
+            background-color: #f8d7da;
+            padding: 15px;
+            border-right: 4px solid #dc3545;
+            margin: 20px 0;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 11pt;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+    </style>
+</head>
+<body>
+
+<h1>راهنمای برنامه‌ریزی تولید - Aras Innovator CLI</h1>
+
+<p><strong>تاریخ تهیه:</strong> دسامبر 2025</p>
+<p><strong>نسخه:</strong> 1.0</p>
+
+<div class="info-box">
+<p><strong>نکته:</strong> این سند برای مشاوران برنامه‌ریزی تولید و مدیران پروژه تهیه شده است تا درک کاملی از قابلیت‌ها، مزایا و نحوه استفاده از ابزار Aras Innovator CLI در محیط تولید داشته باشند.</p>
+</div>
+
+<h2>1. بررسی کلی</h2>
+
+<h3>1.1 هدف پروژه</h3>
+
+<p>Aras Innovator CLI یک ابزار یکپارچه برای مدیریت اسناد و فایل‌ها در سیستم Aras Innovator PLM است که امکان:</p>
+<ul>
+    <li>ایجاد خودکار اسناد</li>
+    <li>آپلود فایل‌ها به مخزن Aras</li>
+    <li>اجرای دستورات AML از طریق خط فرمان</li>
+    <li>یکپارچگی با Windows Explorer برای آپلود سریع</li>
+</ul>
+<p>را فراهم می‌کند.</p>
+
+<h3>1.2 مزایای کسب و کار</h3>
+
+<ol>
+    <li><strong>افزایش بهره‌وری:</strong> کاهش زمان مورد نیاز برای ایجاد سند و آپلود فایل</li>
+    <li><strong>کاهش خطاهای دستی:</strong> خودکارسازی فرآیندها خطاهای انسانی را کاهش می‌دهد</li>
+    <li><strong>دسترسی آسان:</strong> رابط گرافیکی کاربرپسند برای کاربران غیرفنی</li>
+    <li><strong>یکپارچگی با Windows:</strong> امکان آپلود مستقیم از Windows Explorer</li>
+    <li><strong>قابلیت اسکریپت‌نویسی:</strong> امکان خودکارسازی از طریق خط فرمان</li>
+</ol>
+
+<div class="page-break"></div>
+
+<h2>2. موارد استفاده</h2>
+
+<h3>2.1 آپلود اسناد فنی</h3>
+
+<p><strong>سناریو:</strong> مهندسان نیاز به آپلود سریع نقشه‌ها، مشخصات فنی و مستندات دارند.</p>
+
+<p><strong>راه‌حل:</strong> استفاده از رابط گرافیکی یا Send To برای آپلود مستقیم فایل‌ها.</p>
+
+<p><strong>مزایا:</strong></p>
+<ul>
+    <li>کاهش زمان آپلود از چند دقیقه به چند ثانیه</li>
+    <li>کاهش خطاهای دستی</li>
+    <li>امکان آپلود چندین فایل در مدت زمان کوتاه</li>
+</ul>
+
+<h3>2.2 خودکارسازی فرآیندها</h3>
+
+<p><strong>سناریو:</strong> نیاز به ایجاد خودکار اسناد از سیستم‌های خارجی یا اسکریپت‌ها.</p>
+
+<p><strong>راه‌حل:</strong> استفاده از رابط خط فرمان با پارامترهای مناسب.</p>
+
+<p><strong>مزایا:</strong></p>
+<ul>
+    <li>امکان یکپارچه‌سازی با سیستم‌های دیگر</li>
+    <li>اجرای دسته‌ای عملیات</li>
+    <li>کاهش نیاز به مداخله دستی</li>
+</ul>
+
+<h3>2.3 مدیریت اسناد دسته‌ای</h3>
+
+<p><strong>سناریو:</strong> نیاز به آپلود تعداد زیادی فایل به صورت همزمان.</p>
+
+<p><strong>راه‌حل:</strong> استفاده از اسکریپت‌های PowerShell یا Batch با رابط خط فرمان.</p>
+
+<p><strong>مزایا:</strong></p>
+<ul>
+    <li>پردازش دسته‌ای فایل‌ها</li>
+    <li>کاهش زمان کل عملیات</li>
+    <li>امکان برنامه‌ریزی برای اجرای خودکار</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h2>3. معماری و یکپارچگی</h2>
+
+<h3>3.1 معماری سیستم</h3>
+
+<p>سیستم از سه لایه اصلی تشکیل شده است:</p>
+<ol>
+    <li><strong>لایه رابط کاربری:</strong> رابط گرافیکی Windows Forms و رابط خط فرمان</li>
+    <li><strong>لایه منطق کسب و کار:</strong> مدیریت اتصال به Aras و عملیات آپلود</li>
+    <li><strong>لایه یکپارچگی:</strong> ارتباط با سرور Aras Innovator</li>
+</ol>
+
+<h3>3.2 یکپارچگی‌های ممکن</h3>
+
+<table>
+    <tr>
+        <th>سیستم</th>
+        <th>نوع یکپارچگی</th>
+        <th>مزایا</th>
+    </tr>
+    <tr>
+        <td>سیستم‌های ERP</td>
+        <td>API / CLI</td>
+        <td>ایجاد خودکار اسناد از سیستم ERP</td>
+    </tr>
+    <tr>
+        <td>سیستم‌های CAD</td>
+        <td>CLI / Send To</td>
+        <td>آپلود مستقیم نقشه‌ها از نرم‌افزار CAD</td>
+    </tr>
+    <tr>
+        <td>سیستم‌های مدیریت محتوا</td>
+        <td>CLI</td>
+        <td>همگام‌سازی محتوا با Aras</td>
+    </tr>
+    <tr>
+        <td>اسکریپت‌های خودکارسازی</td>
+        <td>CLI</td>
+        <td>اجرای عملیات برنامه‌ریزی شده</td>
+    </tr>
+</table>
+
+<div class="page-break"></div>
+
+<h2>4. الزامات پیاده‌سازی</h2>
+
+<h3>4.1 الزامات سخت‌افزاری</h3>
+
+<ul>
+    <li><strong>سرور:</strong> دسترسی به سرور Aras Innovator</li>
+    <li><strong>کلاینت:</strong> Windows 7 یا بالاتر</li>
+    <li><strong>شبکه:</strong> اتصال پایدار به سرور Aras</li>
+</ul>
+
+<h3>4.2 الزامات نرم‌افزاری</h3>
+
+<ul>
+    <li>.NET Framework 4.7.2 یا بالاتر</li>
+    <li>دسترسی به Aras Innovator (نسخه 14 یا 15)</li>
+    <li>مجوزهای مناسب در Aras برای ایجاد Document و آپلود File</li>
+</ul>
+
+<h3>4.3 الزامات کاربری</h3>
+
+<ul>
+    <li>آموزش اولیه برای کاربران (حدود 30 دقیقه)</li>
+    <li>دسترسی به مستندات</li>
+    <li>پشتیبانی فنی در صورت نیاز</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h2>5. برنامه استقرار</h2>
+
+<h3>5.1 فاز 1: آزمایش (Pilot)</h3>
+
+<p><strong>مدت زمان:</strong> 1-2 هفته</p>
+
+<p><strong>فعالیت‌ها:</strong></p>
+<ol>
+    <li>نصب ابزار روی سیستم‌های آزمایشی</li>
+    <li>آموزش کاربران منتخب</li>
+    <li>تست با داده‌های نمونه</li>
+    <li>جمع‌آوری بازخورد</li>
+</ol>
+
+<p><strong>معیارهای موفقیت:</strong></p>
+<ul>
+    <li>آپلود موفق حداقل 10 سند</li>
+    <li>رضایت کاربران</li>
+    <li>عدم وجود خطاهای بحرانی</li>
+</ul>
+
+<h3>5.2 فاز 2: استقرار محدود</h3>
+
+<p><strong>مدت زمان:</strong> 2-3 هفته</p>
+
+<p><strong>فعالیت‌ها:</strong></p>
+<ol>
+    <li>استقرار در یک بخش یا تیم</li>
+    <li>نظارت بر استفاده</li>
+    <li>رفع مشکلات</li>
+    <li>بهینه‌سازی بر اساس بازخورد</li>
+</ol>
+
+<p><strong>معیارهای موفقیت:</strong></p>
+<ul>
+    <li>استفاده منظم توسط تیم</li>
+    <li>کاهش زمان آپلود به میزان قابل توجه</li>
+    <li>رضایت کاربران</li>
+</ul>
+
+<h3>5.3 فاز 3: استقرار کامل</h3>
+
+<p><strong>مدت زمان:</strong> 1-2 ماه</p>
+
+<p><strong>فعالیت‌ها:</strong></p>
+<ol>
+    <li>استقرار در تمام بخش‌های مرتبط</li>
+    <li>آموزش کامل کاربران</li>
+    <li>مستندسازی فرآیندها</li>
+    <li>پشتیبانی مداوم</li>
+</ol>
+
+<p><strong>معیارهای موفقیت:</strong></p>
+<ul>
+    <li>استفاده توسط حداقل 80% کاربران هدف</li>
+    <li>کاهش کلی زمان آپلود</li>
+    <li>افزایش رضایت کاربران</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h2>6. معیارهای عملکرد</h2>
+
+<h3>6.1 معیارهای کمی</h3>
+
+<table>
+    <tr>
+        <th>معیار</th>
+        <th>قبل از استقرار</th>
+        <th>هدف پس از استقرار</th>
+    </tr>
+    <tr>
+        <td>زمان آپلود فایل</td>
+        <td>5-10 دقیقه</td>
+        <td>30-60 ثانیه</td>
+    </tr>
+    <tr>
+        <td>نرخ خطا</td>
+        <td>5-10%</td>
+        <td>&lt; 1%</td>
+    </tr>
+    <tr>
+        <td>نرخ پذیرش</td>
+        <td>N/A</td>
+        <td>&gt; 80%</td>
+    </tr>
+    <tr>
+        <td>تعداد آپلودهای روزانه</td>
+        <td>X</td>
+        <td>X + 30%</td>
+    </tr>
+</table>
+
+<h3>6.2 معیارهای کیفی</h3>
+
+<ul>
+    <li><strong>رضایت کاربران:</strong> نظرسنجی رضایت کاربران (هدف: &gt; 4 از 5)</li>
+    <li><strong>سهولت استفاده:</strong> ارزیابی سهولت استفاده رابط گرافیکی</li>
+    <li><strong>قابلیت اطمینان:</strong> نرخ موفقیت آپلودها (هدف: &gt; 99%)</li>
+    <li><strong>پشتیبانی:</strong> زمان پاسخ به مشکلات (هدف: &lt; 2 ساعت)</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h2>7. مدیریت ریسک</h2>
+
+<h3>7.1 ریسک‌های شناسایی شده</h3>
+
+<table>
+    <tr>
+        <th>ریسک</th>
+        <th>احتمال</th>
+        <th>تأثیر</th>
+        <th>راه‌حل</th>
+    </tr>
+    <tr>
+        <td>مقاومت کاربران در برابر تغییر</td>
+        <td>متوسط</td>
+        <td>متوسط</td>
+        <td>آموزش مناسب و پشتیبانی</td>
+    </tr>
+    <tr>
+        <td>مشکلات اتصال شبکه</td>
+        <td>پایین</td>
+        <td>بالا</td>
+        <td>پشتیبانی فنی و راهنمای عیب‌یابی</td>
+    </tr>
+    <tr>
+        <td>مشکلات مجوزها در Aras</td>
+        <td>پایین</td>
+        <td>متوسط</td>
+        <td>بررسی مجوزها قبل از استقرار</td>
+    </tr>
+    <tr>
+        <td>مشکلات فنی نرم‌افزار</td>
+        <td>پایین</td>
+        <td>متوسط</td>
+        <td>تست کامل قبل از استقرار</td>
+    </tr>
+</table>
+
+<h3>7.2 برنامه پشتیبان</h3>
+
+<div class="info-box">
+<ul>
+    <li>حفظ روش‌های قبلی آپلود تا زمان اطمینان کامل</li>
+    <li>آموزش کاربران در استفاده از هر دو روش</li>
+    <li>پشتیبانی فنی 24/7 در فاز اولیه</li>
+    <li>برنامه بازگشت به حالت قبلی در صورت نیاز</li>
+</ul>
+</div>
+
+<div class="page-break"></div>
+
+<h2>8. هزینه‌ها و بازگشت سرمایه</h2>
+
+<h3>8.1 هزینه‌های اولیه</h3>
+
+<table>
+    <tr>
+        <th>اقلام</th>
+        <th>هزینه</th>
+        <th>توضیحات</th>
+    </tr>
+    <tr>
+        <td>توسعه</td>
+        <td>تکمیل شده</td>
+        <td>پروژه منبع باز</td>
+    </tr>
+    <tr>
+        <td>نصب و پیکربندی</td>
+        <td>2-4 ساعت</td>
+        <td>کار فنی</td>
+    </tr>
+    <tr>
+        <td>آموزش</td>
+        <td>1-2 ساعت/کاربر</td>
+        <td>برای هر کاربر</td>
+    </tr>
+    <tr>
+        <td>پشتیبانی</td>
+        <td>بر اساس نیاز</td>
+        <td>ساعتی / ماهانه</td>
+    </tr>
+</table>
+
+<h3>8.2 صرفه‌جویی پیش‌بینی شده</h3>
+
+<ul>
+    <li><strong>زمان:</strong> کاهش 70-80% زمان آپلود فایل</li>
+    <li><strong>خطاها:</strong> کاهش 90% خطاهای دستی</li>
+    <li><strong>بهره‌وری:</strong> افزایش 30-40% در تعداد آپلودهای روزانه</li>
+</ul>
+
+<h3>8.3 بازگشت سرمایه (ROI)</h3>
+
+<div class="highlight">
+<p><strong>محاسبه نمونه:</strong></p>
+<p>با فرض:</p>
+<ul>
+    <li>10 کاربر فعال</li>
+    <li>20 آپلود در روز</li>
+    <li>5 دقیقه صرفه‌جویی در هر آپلود</li>
+    <li>هزینه ساعتی: X تومان</li>
+</ul>
+
+<p><strong>صرفه‌جویی روزانه:</strong> 10 کاربر × 20 آپلود × 5 دقیقه = 1000 دقیقه = 16.7 ساعت</p>
+<p><strong>صرفه‌جویی سالانه:</strong> 16.7 ساعت × 250 روز کاری = 4175 ساعت</p>
+<p><strong>ارزش صرفه‌جویی:</strong> 4175 ساعت × X تومان = Y تومان</p>
+</div>
+
+<div class="page-break"></div>
+
+<h2>9. پشتیبانی و نگهداری</h2>
+
+<h3>9.1 پشتیبانی فنی</h3>
+
+<table>
+    <tr>
+        <th>سطح</th>
+        <th>مسئولیت</th>
+        <th>زمان پاسخ</th>
+    </tr>
+    <tr>
+        <td>سطح 1</td>
+        <td>پشتیبانی کاربران (داخلی)</td>
+        <td>فوری</td>
+    </tr>
+    <tr>
+        <td>سطح 2</td>
+        <td>پشتیبانی فنی (تیم IT)</td>
+        <td>&lt; 2 ساعت</td>
+    </tr>
+    <tr>
+        <td>سطح 3</td>
+        <td>پشتیبانی توسعه‌دهنده</td>
+        <td>&lt; 24 ساعت</td>
+    </tr>
+</table>
+
+<h3>9.2 نگهداری</h3>
+
+<ul>
+    <li><strong>روزانه:</strong> نظارت بر لاگ‌ها و خطاها</li>
+    <li><strong>هفتگی:</strong> بررسی عملکرد و استفاده</li>
+    <li><strong>ماهانه:</strong> به‌روزرسانی و بهینه‌سازی</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h2>10. نتیجه‌گیری</h2>
+
+<p>Aras Innovator CLI ابزاری قدرتمند برای بهبود فرآیندهای مدیریت اسناد در Aras Innovator است. با استقرار مناسب و آموزش کاربران، می‌توان به بهبود قابل توجهی در بهره‌وری و کاهش خطاها دست یافت.</p>
+
+<h3>10.1 توصیه‌ها</h3>
+
+<ol>
+    <li>شروع با فاز آزمایش برای شناسایی مشکلات</li>
+    <li>آموزش کامل کاربران قبل از استقرار کامل</li>
+    <li>نظارت مداوم بر عملکرد و استفاده</li>
+    <li>جمع‌آوری بازخورد برای بهبود مستمر</li>
+</ol>
+
+<h3>10.2 تماس</h3>
+
+<div class="info-box">
+<p><strong>برای سوالات و پشتیبانی:</strong></p>
+<ul>
+    <li>مخزن GitHub: https://github.com/jalaliamirreza/aras-innovator-cli</li>
+    <li>مستندات فنی: مراجعه به DEVELOPER.md</li>
+    <li>راهنمای کاربر: مراجعه به README_FA.md</li>
+</ul>
+</div>
+
+<hr>
+<p style="text-align: center; color: #666; margin-top: 50px;">
+<strong>Aras Innovator CLI - راهنمای برنامه‌ریزی تولید</strong><br>
+نسخه 1.0 - دسامبر 2025
+</p>
+
+</body>
+</html>
+
+
