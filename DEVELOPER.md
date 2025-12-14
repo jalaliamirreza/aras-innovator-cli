@@ -323,6 +323,128 @@ foreach (string arg in args)
 - Aras Community: https://community.aras.com/
 - File Upload Pattern: https://community.aras.com/discussions/development/upload-a-file-using-c-as-a-server-method/6209
 
+## Email Notification & One-Click Approval
+
+### Overview
+
+The system supports email notifications with one-click document approval/rejection via Aras CWS (Configurable Web Services).
+
+### Components
+
+#### 1. EmailService (ArasCLI/Services/EmailService.cs)
+
+**Purpose**: Send HTML email notifications with approval capabilities.
+
+**Key Methods**:
+- `SendReviewNotification()`: Send review request email with document details
+- `GenerateApprovalHtml()`: Create HTML attachment for one-click approval
+- `BuildHtmlEmail()`: Generate beautiful HTML email body
+- `SendHtmlEmailWithMultipleAttachments()`: Send email with document + approval HTML
+
+**Configuration** (in AppConfig):
+```csharp
+SmtpServer = "mail.example.com"
+SmtpPort = 587
+SmtpUseSsl = true
+SmtpUsername = "user@example.com"
+SmtpPassword = "password"
+SenderEmail = "plm@example.com"
+ReviewerEmail = "reviewer@example.com"
+ArasServerUrl = "http://server/InnovatorServer"
+ApprovalApiKey = "APIKEY_xxx..."
+```
+
+#### 2. PLM_ApproveDocument (Aras Server Method)
+
+**Location**: `ArasServerMethods/PLM_ApproveDocument_Method.cs`
+
+**Purpose**: CWS endpoint for document approval/rejection.
+
+**Parameters** (via CWS):
+- `id`: Document item ID (GUID)
+- `type`: Item type (default: "Document")
+- `action`: "approve" or "reject"
+
+**Workflow**:
+1. Validates parameters
+2. Fetches document by ID
+3. Checks document is "In Review" state
+4. Promotes to "Released" (approve) or "Preliminary" (reject)
+5. Returns success/error message
+
+#### 3. CWS Configuration in Aras
+
+**Setup Steps**:
+1. Administration → Configurable Web Services
+2. Create new "PLM_Approval" service
+3. Add Global Method: PLM_ApproveDocument
+4. Define parameters: id (string), type (string), action (string)
+5. Create API Key with Document read/promote permissions
+
+**Endpoint URL**:
+```
+POST http://server/InnovatorServer/Server/ws/PLM_Approval/v1/PLM_ApproveDocument
+```
+
+**Headers**:
+```
+Content-Type: application/json
+Authorization: ApiKey APIKEY_xxx...
+```
+
+**Request Body**:
+```json
+{
+  "id": "DOCUMENT_GUID",
+  "type": "Document",
+  "action": "approve"
+}
+```
+
+**Response** (OData format):
+```json
+{
+  "@odata.context": "...",
+  "value": "Document DOC-001 approved and released!"
+}
+```
+
+### Email Flow
+
+1. **Check-In with "Send for Review"**:
+   - Document promoted to "In Review" state
+   - EmailService sends notification to reviewer
+
+2. **Email Contents**:
+   - Beautiful HTML email with document details
+   - Approve/Reject buttons (link to hosted HTML page)
+   - Attached `Approve_*.html` file for offline approval
+
+3. **Approval Process**:
+   - Reviewer opens attached HTML or clicks email button
+   - Clicks Approve or Reject
+   - JavaScript calls CWS endpoint
+   - Document state changes in Aras
+
+### Testing
+
+**Test CWS Endpoint**:
+```bash
+curl -X POST "http://server/InnovatorServer/Server/ws/PLM_Approval/v1/PLM_ApproveDocument" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: ApiKey APIKEY_xxx..." \
+  -d '{"id":"DOCUMENT_ID","type":"Document","action":"approve"}'
+```
+
+**Test Email**:
+```csharp
+var emailService = new EmailService(config);
+emailService.SendReviewNotification(
+    "DOC-001", "Test Document", "A", "John Doe",
+    "DOCUMENT_GUID", "Document", "/path/to/file.pdf"
+);
+```
+
 ## Future Enhancements
 
 Potential improvements:
@@ -332,5 +454,7 @@ Potential improvements:
 - Configuration wizard for first-time setup
 - Support for other item types (Part, CAD, etc.)
 - Integration with Aras workflow system
+- Multi-reviewer approval workflow
+- Approval comments/notes
 
 
