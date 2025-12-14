@@ -95,10 +95,12 @@ namespace ArasCLI
                 MultiSelect = false,
                 CheckBoxes = true
             };
-            lvCheckedOut.Columns.Add("Item Number", 120);
-            lvCheckedOut.Columns.Add("Name", 180);
-            lvCheckedOut.Columns.Add("Type", 80);
-            lvCheckedOut.Columns.Add("Local File", 200);
+            lvCheckedOut.Columns.Add("Item Number", 100);
+            lvCheckedOut.Columns.Add("Name", 130);
+            lvCheckedOut.Columns.Add("Rev", 40);
+            lvCheckedOut.Columns.Add("State", 80);
+            lvCheckedOut.Columns.Add("Type", 70);
+            lvCheckedOut.Columns.Add("Local File", 180);
             lvCheckedOut.ItemChecked += LvCheckedOut_ItemChecked;
 
             this.Controls.Add(lvCheckedOut);
@@ -239,7 +241,7 @@ namespace ArasCLI
 
                 // Search for CAD items locked by current user
                 Item query = innovator.newItem("CAD", "get");
-                query.setAttribute("select", "id,item_number,name,classification,locked_by_id,native_file");
+                query.setAttribute("select", "id,item_number,name,major_rev,state,locked_by_id,native_file");
                 query.setProperty("locked_by_id", currentUserId);
                 query.setAttribute("orderBy", "modified_on DESC");
                 query.setAttribute("maxRecords", "50");
@@ -258,7 +260,7 @@ namespace ArasCLI
 
                 // Also search for Document items locked by current user
                 query = innovator.newItem("Document", "get");
-                query.setAttribute("select", "id,item_number,name,classification,locked_by_id");
+                query.setAttribute("select", "id,item_number,name,major_rev,state,locked_by_id");
                 query.setProperty("locked_by_id", currentUserId);
                 query.setAttribute("orderBy", "modified_on DESC");
                 query.setAttribute("maxRecords", "50");
@@ -297,6 +299,8 @@ namespace ArasCLI
             string itemNumber = item.getProperty("item_number", "");
             string itemName = item.getProperty("name", "");
             string itemId = item.getID();
+            string revision = item.getProperty("major_rev", "");
+            string state = item.getProperty("state", "");
 
             // Try to find corresponding local file
             string localFile = "";
@@ -376,7 +380,9 @@ namespace ArasCLI
 
             ListViewItem lvi = new ListViewItem(itemNumber);
             lvi.SubItems.Add(itemName);
-            lvi.SubItems.Add(itemType);
+            lvi.SubItems.Add(revision); // Revision
+            lvi.SubItems.Add(state); // State
+            lvi.SubItems.Add(itemType); // Type
             lvi.SubItems.Add(string.IsNullOrEmpty(localFile) ? "(not found locally)" : fileName);
             lvi.Tag = new CheckedOutItemInfo
             {
@@ -386,14 +392,24 @@ namespace ArasCLI
                 ItemType = itemType,
                 LocalFilePath = localFile,
                 FileName = fileName,
-                OriginalFileId = fileId
+                OriginalFileId = fileId,
+                Revision = revision,
+                State = state
             };
 
-            // Highlight if local file exists
+            // Highlight based on state - can only check-in Preliminary items
             if (!string.IsNullOrEmpty(localFile))
             {
-                lvi.ForeColor = Color.Black;
-                lvi.Checked = true;
+                if (state == "Preliminary")
+                {
+                    lvi.ForeColor = Color.Black;
+                    lvi.Checked = true;
+                }
+                else
+                {
+                    lvi.ForeColor = Color.Orange; // Released/In Review - can't check in
+                    lvi.Checked = false;
+                }
             }
             else
             {
@@ -451,6 +467,7 @@ namespace ArasCLI
             int successCount = 0;
             int failCount = 0;
             List<string> errors = new List<string>();
+            List<string> successDetails = new List<string>();
 
             try
             {
@@ -466,6 +483,29 @@ namespace ArasCLI
 
                     try
                     {
+                        // Validate state before allowing check-in
+                        string currentState = info.State ?? "";
+                        if (currentState != "Preliminary" && !string.IsNullOrEmpty(currentState))
+                        {
+                            string errorMsg;
+                            switch (currentState)
+                            {
+                                case "Released":
+                                    errorMsg = "Cannot check-in. Document is Released. Create new revision in Aras first.";
+                                    break;
+                                case "In Review":
+                                    errorMsg = "Cannot check-in. Document is In Review.";
+                                    break;
+                                case "Obsolete":
+                                    errorMsg = "Cannot check-in. Document is Obsolete.";
+                                    break;
+                                default:
+                                    errorMsg = $"Cannot check-in. Document is in '{currentState}' state.";
+                                    break;
+                            }
+                            throw new Exception(errorMsg);
+                        }
+
                         // Upload new file if local file exists
                         if (!string.IsNullOrEmpty(info.LocalFilePath) && File.Exists(info.LocalFilePath))
                         {
@@ -649,22 +689,33 @@ namespace ArasCLI
                         }
 
                         successCount++;
+                        successDetails.Add($"Document: {info.ItemNumber}\nRevision: {info.Revision}\nState: {info.State}\nStatus: Unlocked\nFile uploaded successfully");
                         lvi.ForeColor = Color.Green;
                         lvi.Checked = false;
                     }
                     catch (Exception ex)
                     {
                         failCount++;
-                        errors.Add($"{info.ItemNumber}: {ex.Message}");
+                        errors.Add($"{info.ItemNumber} (Rev {info.Revision}): {ex.Message}");
                         lvi.ForeColor = Color.Red;
                     }
                 }
 
                 // Show results
-                string message = $"Check-in complete.\n\nSuccess: {successCount}\nFailed: {failCount}";
-                if (errors.Count > 0)
+                string message;
+                if (successCount == 1 && failCount == 0)
                 {
-                    message += "\n\nErrors:\n" + string.Join("\n", errors);
+                    // Single item success - show detailed info
+                    message = successDetails[0];
+                }
+                else
+                {
+                    // Multiple items or mixed results
+                    message = $"Check-in complete.\n\nSuccess: {successCount}\nFailed: {failCount}";
+                    if (errors.Count > 0)
+                    {
+                        message += "\n\nErrors:\n" + string.Join("\n", errors);
+                    }
                 }
 
                 MessageBox.Show(message, "Check In Results",
@@ -774,6 +825,8 @@ namespace ArasCLI
             public string LocalFilePath { get; set; }
             public string FileName { get; set; }
             public string OriginalFileId { get; set; }
+            public string Revision { get; set; }
+            public string State { get; set; }
         }
     }
 }

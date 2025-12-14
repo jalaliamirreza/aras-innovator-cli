@@ -106,11 +106,12 @@ namespace ArasCLI
                 GridLines = true,
                 MultiSelect = false
             };
-            lvResults.Columns.Add("Item Number", 120);
-            lvResults.Columns.Add("Name", 200);
-            lvResults.Columns.Add("Type", 100);
+            lvResults.Columns.Add("Item Number", 100);
+            lvResults.Columns.Add("Name", 150);
+            lvResults.Columns.Add("Rev", 40);
             lvResults.Columns.Add("State", 80);
-            lvResults.Columns.Add("Modified", 120);
+            lvResults.Columns.Add("Type", 70);
+            lvResults.Columns.Add("Locked By", 100);
             lvResults.DoubleClick += LvResults_DoubleClick;
 
             this.Controls.Add(lvResults);
@@ -279,7 +280,7 @@ namespace ArasCLI
 
                 // Search for Document items first
                 Item docQuery = innovator.newItem("Document", "get");
-                docQuery.setAttribute("select", "item_number,name,classification,state,modified_on");
+                docQuery.setAttribute("select", "item_number,name,major_rev,state,locked_by_id");
 
                 if (searchTerm != "*")
                 {
@@ -298,14 +299,14 @@ namespace ArasCLI
                     for (int i = 0; i < count; i++)
                     {
                         Item item = docResult.getItemByIndex(i);
-                        AddItemToResults(item, "Document");
+                        AddItemToResults(item, "Document", innovator);
                         totalCount++;
                     }
                 }
 
                 // Also search for CAD items
                 Item cadQuery = innovator.newItem("CAD", "get");
-                cadQuery.setAttribute("select", "item_number,name,classification,state,modified_on");
+                cadQuery.setAttribute("select", "item_number,name,major_rev,state,locked_by_id");
 
                 if (searchTerm != "*")
                 {
@@ -324,7 +325,7 @@ namespace ArasCLI
                     for (int i = 0; i < count; i++)
                     {
                         Item item = cadResult.getItemByIndex(i);
-                        AddItemToResults(item, "CAD");
+                        AddItemToResults(item, "CAD", innovator);
                         totalCount++;
                     }
                 }
@@ -350,25 +351,63 @@ namespace ArasCLI
             }
         }
 
-        private void AddItemToResults(Item item, string itemType)
+        private void AddItemToResults(Item item, string itemType, Innovator innovator)
         {
             ListViewItem lvi = new ListViewItem(item.getProperty("item_number", ""));
             lvi.SubItems.Add(item.getProperty("name", ""));
-            lvi.SubItems.Add(itemType); // Show item type instead of classification
-            lvi.SubItems.Add(item.getProperty("state", ""));
+            lvi.SubItems.Add(item.getProperty("major_rev", "")); // Revision
+            lvi.SubItems.Add(item.getProperty("state", "")); // State
+            lvi.SubItems.Add(itemType); // Type
 
-            string modifiedOn = item.getProperty("modified_on", "");
-            if (!string.IsNullOrEmpty(modifiedOn) && DateTime.TryParse(modifiedOn, out DateTime dt))
+            // Get locked by username
+            string lockedById = item.getProperty("locked_by_id", "");
+            string lockedByName = "";
+            if (!string.IsNullOrEmpty(lockedById))
             {
-                lvi.SubItems.Add(dt.ToString("yyyy-MM-dd HH:mm"));
+                try
+                {
+                    Item lockedByUser = innovator.getItemById("User", lockedById);
+                    if (lockedByUser != null && !lockedByUser.isError())
+                    {
+                        lockedByName = lockedByUser.getProperty("keyed_name", lockedById);
+                    }
+                    else
+                    {
+                        lockedByName = lockedById;
+                    }
+                }
+                catch
+                {
+                    lockedByName = lockedById;
+                }
             }
-            else
+            lvi.SubItems.Add(lockedByName); // Locked By
+
+            // Store item info for checkout
+            lvi.Tag = new SearchResultInfo
             {
-                lvi.SubItems.Add(modifiedOn);
+                ItemId = item.getID(),
+                ItemType = itemType,
+                LockedById = lockedById,
+                LockedByName = lockedByName,
+                Revision = item.getProperty("major_rev", ""),
+                State = item.getProperty("state", "")
+            };
+
+            // Highlight locked items
+            if (!string.IsNullOrEmpty(lockedById))
+            {
+                string currentUserId = innovator.getUserID();
+                if (lockedById == currentUserId)
+                {
+                    lvi.ForeColor = Color.Blue; // Locked by me
+                }
+                else
+                {
+                    lvi.ForeColor = Color.Red; // Locked by someone else
+                }
             }
 
-            // Store both item ID and item type for checkout
-            lvi.Tag = new SearchResultInfo { ItemId = item.getID(), ItemType = itemType };
             lvResults.Items.Add(lvi);
         }
 
@@ -451,6 +490,8 @@ namespace ArasCLI
             string itemType = resultInfo?.ItemType ?? _foundItemType;
             string itemNumber = selected.Text;
             string itemName = selected.SubItems[1].Text;
+            string revision = resultInfo?.Revision ?? "";
+            string state = resultInfo?.State ?? "";
 
             // Update _foundItemType for compatibility with rest of checkout code
             _foundItemType = itemType;
@@ -475,42 +516,33 @@ namespace ArasCLI
                     throw new Exception("Not connected to Aras. Please login first.");
                 }
 
-                // Check if item is already locked by someone else
-                SetStatus($"Checking lock status for {itemNumber}...", Color.Orange);
-                Application.DoEvents();
+                // Check if item is already locked by someone else (using cached info first)
+                string currentUserId = innovator.getUserID();
+                string lockedById = resultInfo?.LockedById ?? "";
+                string lockedByName = resultInfo?.LockedByName ?? "";
 
-                Item checkItem = innovator.getItemById(itemType, itemId);
-                if (checkItem != null && !checkItem.isError())
+                if (!string.IsNullOrEmpty(lockedById) && lockedById != currentUserId)
                 {
-                    string lockedById = checkItem.getProperty("locked_by_id", "");
-                    if (!string.IsNullOrEmpty(lockedById))
-                    {
-                        string currentUserId = innovator.getUserID();
-                        if (lockedById != currentUserId)
-                        {
-                            // Get the name of the user who locked it
-                            Item lockedByUser = innovator.getItemById("User", lockedById);
-                            string lockedByName = lockedByUser != null && !lockedByUser.isError()
-                                ? lockedByUser.getProperty("keyed_name", lockedById)
-                                : lockedById;
-
-                            throw new Exception($"Item is locked by: {lockedByName}\n\nCannot check out an item that is locked by another user.");
-                        }
-                    }
+                    throw new Exception($"Document is locked by: {lockedByName}\n\nCannot check out an item that is locked by another user.");
                 }
 
-                // Lock the item in Aras (same pattern as ArasService.LockItem)
-                SetStatus($"Locking {itemNumber} in Aras...", Color.Orange);
-                Application.DoEvents();
+                bool alreadyLockedByMe = (!string.IsNullOrEmpty(lockedById) && lockedById == currentUserId);
 
-                Item lockItem = innovator.newItem(_foundItemType, "lock");
-                lockItem.setID(itemId);
-                Item lockResult = lockItem.apply();
-
-                if (lockResult.isError())
+                // Lock the item in Aras if not already locked by me
+                if (!alreadyLockedByMe)
                 {
-                    string lockError = lockResult.getErrorString();
-                    throw new Exception($"Failed to lock item: {lockError}");
+                    SetStatus($"Locking {itemNumber} in Aras...", Color.Orange);
+                    Application.DoEvents();
+
+                    Item lockItem = innovator.newItem(_foundItemType, "lock");
+                    lockItem.setID(itemId);
+                    Item lockResult = lockItem.apply();
+
+                    if (lockResult.isError())
+                    {
+                        string lockError = lockResult.getErrorString();
+                        throw new Exception($"Failed to lock item: {lockError}");
+                    }
                 }
 
                 // Get the item using the type that was found during search
@@ -691,33 +723,33 @@ namespace ArasCLI
                     if (openedInCatia)
                     {
                         MessageBox.Show(
-                            $"Item: {itemNumber}\nName: {itemName}\nFile: {fileName}\n\nItem locked in Aras.\nFile downloaded and opened in CATIA.",
+                            $"Document: {itemNumber}\nRevision: {revision}\nState: {state}\nStatus: Locked by you\n\nFile: {fileName}\nFile downloaded and opened in CATIA.",
                             "Check Out Complete",
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
 
-                        SetStatus($"Checked out & locked: {itemNumber} - Opened in CATIA", Color.Green);
+                        SetStatus($"Checked out: {itemNumber} Rev {revision} ({state}) - Opened in CATIA", Color.Green);
                     }
                     else
                     {
                         MessageBox.Show(
-                            $"Item: {itemNumber}\nName: {itemName}\nFile: {fileName}\n\nItem locked in Aras.\nFile downloaded to:\n{localFilePath}\n\nCould not open in CATIA: {openError}",
+                            $"Document: {itemNumber}\nRevision: {revision}\nState: {state}\nStatus: Locked by you\n\nFile: {fileName}\nFile downloaded to:\n{localFilePath}\n\nCould not open in CATIA: {openError}",
                             "Check Out Complete",
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
 
-                        SetStatus($"Checked out & locked: {itemNumber} - File downloaded", Color.Green);
+                        SetStatus($"Checked out: {itemNumber} Rev {revision} ({state}) - File downloaded", Color.Green);
                     }
                 }
                 else
                 {
                     MessageBox.Show(
-                        $"Item: {itemNumber}\nName: {itemName}\n\nItem locked in Aras.\nNo file attached or download not available.",
+                        $"Document: {itemNumber}\nRevision: {revision}\nState: {state}\nStatus: Locked by you\n\nNo file attached or download not available.",
                         "Check Out",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information);
 
-                    SetStatus($"Checked out & locked: {itemNumber} (no file)", Color.Orange);
+                    SetStatus($"Checked out: {itemNumber} Rev {revision} ({state}) (no file)", Color.Orange);
                 }
 
                 // Save workspace to config
@@ -752,6 +784,10 @@ namespace ArasCLI
         {
             public string ItemId { get; set; }
             public string ItemType { get; set; }
+            public string LockedById { get; set; }
+            public string LockedByName { get; set; }
+            public string Revision { get; set; }
+            public string State { get; set; }
         }
     }
 }
